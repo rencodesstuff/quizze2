@@ -13,7 +13,7 @@ const SignInPage = () => {
             {/* Welcome Text Container */}
             <div className="flex-1 mb-6 md:mb-0">
               <h1 className="text-3xl font-bold text-white mb-4 text-center md:text-left">WELCOME BACK!</h1>
-              <p className="text-white text-center md:text-left">Don`&apos;`t have an account yet?</p>
+              <p className="text-white text-center md:text-left">Don&apos;t have an account yet?</p>
               <Link legacyBehavior href="/signup">
                 <a className="text-lg text-indigo-500 underline hover:text-indigo-400 block text-center md:text-left">
                   Register
