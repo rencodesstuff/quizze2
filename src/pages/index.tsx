@@ -4,7 +4,7 @@ import Image from "next/image";
 
 export default function Home() {
 
-  {/* Typewriter Words */}
+  {/* Typewriter Words */ }
   const words = [
     { text: "Challenge" },
     { text: "your" },
@@ -23,7 +23,6 @@ export default function Home() {
           Quizze
         </h1>
       </header>
-
       <main className="flex-grow">
         {/* Hero Section */}
         <section
@@ -33,7 +32,7 @@ export default function Home() {
           <div className="absolute inset-0 bg-black opacity-50"></div>
           <div className="relative text-center text-white p-8">
             <h2 className="text-5xl font-extrabold mb-4">The Ultimate Quiz Experience</h2>
-            <TypewriterEffect words={words}/>
+            <TypewriterEffect words={words} />
             <div className="mt-6 space-x-4">
 
               <Link legacyBehavior href="/signin">
@@ -116,7 +115,11 @@ export default function Home() {
                   role: "Head Software Tester",
                   img: "/path/to/alice.jpg",
                 },
-                { name: "Syasya", role: "Head QA", img: "/path/to/bob.jpg" },
+                {
+                  name: "Syasya",
+                  role: "Head QA",
+                  img: "/path/to/bob.jpg"
+                },
               ].map((member, index) => (
                 <div
                   key={index}
@@ -125,6 +128,8 @@ export default function Home() {
                   <Image
                     src={member.img}
                     alt={member.name}
+                    width={500}
+                    height={500}
                     className="w-36 h-40 rounded mx-auto mb-4"
                   />
                   <h4 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -185,7 +190,7 @@ export default function Home() {
             </p>
             <div className="mt-8 max-w-xl mx-auto">
               <p className="text-gray-700 dark:text-gray-300">
-              &quot;The attention and effort Quizze puts into creating engaging
+                &quot;The attention and effort Quizze puts into creating engaging
                 quizzes is unmatched. I love the variety of topics and the
                 challenging questions. It&apos;s my go-to for a fun and educational
                 experience!&quot;

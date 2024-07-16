@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Head from 'next/head';
+import GradientCanvas from '@/gradient/GradientCanvas'
 
 const SignInPage = () => {
   return (
@@ -7,7 +8,8 @@ const SignInPage = () => {
       <Head>
         <title>Sign In | Quizze</title>
       </Head>
-      <div className="flex items-center justify-center min-h-screen animated-gradient">
+      <GradientCanvas />
+      <div className="flex items-center justify-center min-h-screen">
         <div className="bg-black bg-opacity-75 rounded-lg shadow-lg p-4 md:p-10" style={{ maxWidth: '900px', width: '100%' }}>
           <div className="flex flex-col md:flex-row justify-between items-center">
             {/* Welcome Text Container */}

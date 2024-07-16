@@ -1,0 +1,16 @@
+.gradientCanvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  --gradient-color-1: #4a4e4d;
+  --gradient-color-2: #0e9aa7;
+  --gradient-color-3: #f6cd61;
+  --gradient-color-4: #3da4ab;
+}

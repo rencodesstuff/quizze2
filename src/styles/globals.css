@@ -8,23 +8,3 @@
 body {
   font-family: 'Sora', sans-serif;
 }
-
-
-/* Animated Gradient Background */
-@keyframes gradientBG {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-.animated-gradient {
-  background: linear-gradient(-45deg, #00072d, #0a2472, #2193b0, #6dd5ed);
-  background-size: 400% 400%;
-  animation: gradientBG 15s ease infinite;
-}
