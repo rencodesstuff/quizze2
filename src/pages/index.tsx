@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { TypewriterEffect } from "@/ui/typewriter-effect";
+import Image from "next/image";
+
 export default function Home() {
 
   {/* Typewriter Words */}
@@ -120,7 +122,7 @@ export default function Home() {
                   key={index}
                   className="p-6 bg-gray-100 dark:bg-gray-800 rounded-md shadow-md"
                 >
-                  <img
+                  <Image
                     src={member.img}
                     alt={member.name}
                     className="w-36 h-40 rounded mx-auto mb-4"
@@ -145,7 +147,7 @@ export default function Home() {
             </h2>
             <p className="mt-4 text-lg text-gray-700 dark:text-gray-300">
               Engage, learn, and excel. At , we believe there is a better way to
-              meet our clients' needs. We're a company that exists to help you
+              meet our clients`&apos;` needs. We`&apos;`re a company that exists to help you
               achieve more than you ever thought possible.
             </p>
             <p className="mt-4 text-gray-600 dark:text-gray-400">
@@ -155,7 +157,7 @@ export default function Home() {
               useful as they are memorable.
             </p>
             <p className="mt-4 mb-6 text-gray-600 dark:text-gray-400">
-              Let's do great things together. We can't wait to work with you.
+              Let`&apos;`s do great things together. We can`&apos;`t wait to work with you.
             </p>
             <Link legacyBehavior href="/contact">
               <a className="px-6 py-3 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition">
@@ -183,10 +185,10 @@ export default function Home() {
             </p>
             <div className="mt-8 max-w-xl mx-auto">
               <p className="text-gray-700 dark:text-gray-300">
-                "The attention and effort Quizze puts into creating engaging
+              `&quot;`The attention and effort Quizze puts into creating engaging
                 quizzes is unmatched. I love the variety of topics and the
-                challenging questions. It's my go-to for a fun and educational
-                experience!"
+                challenging questions. It`&apos;`s my go-to for a fun and educational
+                experience!`&quot;`
               </p>
               <div className="mt-4 text-red-500">★★★★★</div>
               <p className="mt-2 text-gray-900 dark:text-white font-semibold">
