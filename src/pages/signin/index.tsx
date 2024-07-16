@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Head from 'next/head';
-import GradientCanvas from '@/gradient/GradientCanvas'
+import GradientCanvas from '@/gradient/GradientCanvas';
 
 const SignInPage = () => {
   return (
@@ -25,7 +25,7 @@ const SignInPage = () => {
             {/* Sign In Form Container */}
             <div className="flex-1 max-w-md">
               <h2 className="text-3xl font-bold text-center text-white mb-6">Sign In to Quizze</h2>
-              <form className="space-y-6">
+              <div className="space-y-6">
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-white">
                     Email
@@ -52,13 +52,12 @@ const SignInPage = () => {
                     className="mt-1 w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
-                <button
-                  type="submit"
-                  className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  Sign In
-                </button>
-              </form>
+                <Link legacyBehavior href="/studentdash">
+                  <a className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Sign In
+                  </a>
+                </Link>
+              </div>
               <div className="text-center mt-4">
                 <Link legacyBehavior href="/reset">
                   <a className="text-sm text-indigo-500 hover:text-indigo-400">
