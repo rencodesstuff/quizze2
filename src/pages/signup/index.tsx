@@ -59,7 +59,7 @@ const SignUpPage = () => {
         {/* Form Side */}
         <div className="w-full md:w-1/2 flex items-center justify-center p-10 bg-white">
           <div className="max-w-md w-full">
-            <h1 className="text-3xl font-bold text-center mb-6">Create a free account now</h1>
+            <h1 className="text-3xl font-bold text-center mb-6">Create an account now</h1>
             <form className="space-y-6">
               <div>
                 <label htmlFor="name" className="text-sm font-medium text-gray-700">Name</label>

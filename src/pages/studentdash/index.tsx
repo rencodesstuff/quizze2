@@ -1,4 +1,36 @@
 import Link from 'next/link';
+import { Line } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
+import { DayPicker } from 'react-day-picker';
+
+// Registering components for the chart
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+
+const data = {
+  labels: ['January', 'February', 'March', 'April', 'May', 'June'],
+  datasets: [
+    {
+      label: 'Quiz Scores',
+      data: [65, 59, 80, 81, 56, 55],
+      fill: false,
+      backgroundColor: 'rgb(75, 192, 192)',
+      borderColor: 'rgba(75, 192, 192, 0.2)',
+    },
+  ],
+};
+
+const options = {
+  responsive: true,
+  plugins: {
+    legend: {
+      position: 'top' as const,
+    },
+    title: {
+      display: true,
+      text: 'Monthly Quiz Performance',
+    },
+  },
+};
 
 const StudentDashboard = () => {
   return (
@@ -38,9 +70,10 @@ const StudentDashboard = () => {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-y-auto p-4">
         {/* Navbar */}
-        <div className="flex items-center justify-end bg-white p-4 shadow-md">
+        <div className="flex items-center justify-between bg-white p-4 shadow-md">
+          <h1 className="text-2xl font-bold">Dashboard</h1>
           <div className="flex items-center">
             <img
               src="/ZabirHD.png"
@@ -55,62 +88,66 @@ const StudentDashboard = () => {
         </div>
 
         {/* Content area */}
-        <div className="flex-1 p-4 overflow-y-auto">
-          <h1 className="text-2xl font-bold text-center mb-4">Welcome to your Dashboard!</h1>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          {/* Chart and Calendar */}
+          <div className="md:col-span-2 bg-white p-4 shadow rounded-lg">
+            <Line data={data} options={options} />
+          </div>
+          <div className="bg-white p-4 shadow rounded-lg">
+            <DayPicker />
+          </div>
 
-          {/* Upcoming Quizzes Table */}
-          <div className="mb-8">
-            <h2 className="text-lg font-bold mb-2">Upcoming Quiz</h2>
-            <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-              <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+          {/* Tables */}
+          <div className="md:col-span-2 bg-white shadow rounded-lg p-4">
+            <h2 className="font-semibold text-lg">Upcoming Quizzes</h2>
+            <table className="min-w-full mt-2">
+              <thead>
                 <tr>
-                  <th scope="col" className="px-6 py-3">Name</th>
-                  <th scope="col" className="px-6 py-3">Date</th>
+                  <th className="text-left p-2">Name</th>
+                  <th className="text-left p-2">Date</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
-                  <td className="px-6 py-4">Algebra Quiz</td>
-                  <td className="px-6 py-4">Sept 10</td>
+                <tr>
+                  <td className="p-2">Math Quiz</td>
+                  <td className="p-2">Sept 10</td>
                 </tr>
-                <tr className="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
-                  <td className="px-6 py-4">History Quiz</td>
-                  <td className="px-6 py-4">Sept 15</td>
+                <tr>
+                  <td className="p-2">Chemistry Quiz</td>
+                  <td className="p-2">Sept 15</td>
                 </tr>
-                <tr className="bg-white dark:bg-gray-800">
-                  <td className="px-6 py-4">Science Quiz</td>
-                  <td className="px-6 py-4">Sept 20</td>
+                <tr>
+                  <td className="p-2">Physics Quiz</td>
+                  <td className="p-2">Sept 20</td>
                 </tr>
               </tbody>
             </table>
           </div>
-
-          {/* Recent Quizzes Table */}
-          <div className="mb-8">
-            <h2 className="text-lg font-bold mb-2">Recent Quiz</h2>
-            <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-              <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+          <div className="md:col-span-1 bg-white shadow rounded-lg p-4">
+            <h2 className="font-semibold text-lg">Recent Quizzes</h2>
+            <table className="min-w-full mt-2">
+              <thead>
                 <tr>
-                  <th scope="col" className="px-6 py-3">Name</th>
-                  <th scope="col" className="px-6 py-3">Score</th>
-                  <th scope="col" className="px-6 py-3">Date</th>
+                  <th className="text-left p-2">Name</th>
+                  <th className="text-left p-2">Score</th>
+                  <th className="text-left p-2">Date</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
-                  <td className="px-6 py-4">Math Quiz</td>
-                  <td className="px-6 py-4">85%</td>
-                  <td className="px-6 py-4">Aug 25</td>
+                <tr>
+                  <td className="p-2">History Quiz</td>
+                  <td className="p-2">85%</td>
+                  <td className="p-2">Aug 25</td>
                 </tr>
-                <tr className="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
-                  <td className="px-6 py-4">English Quiz</td>
-                  <td className="px-6 py-4">78%</td>
-                  <td className="px-6 py-4">Aug 18</td>
+                <tr>
+                  <td className="p-2">Literature Quiz</td>
+                  <td className="p-2">78%</td>
+                  <td className="p-2">Aug 20</td>
                 </tr>
-                <tr className="bg-white dark:bg-gray-800">
-                  <td className="px-6 py-4">Physics Quiz</td>
-                  <td className="px-6 py-4">90%</td>
-                  <td className="px-6 py-4">Aug 12</td>
+                <tr>
+                  <td className="p-2">Geography Quiz</td>
+                  <td className="p-2">90%</td>
+                  <td className="p-2">Aug 15</td>
                 </tr>
               </tbody>
             </table>
