@@ -2,7 +2,10 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
-import { DayPicker } from 'react-day-picker';
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
 
 // Registering components for the chart
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
@@ -91,12 +94,28 @@ const StudentDashboard = () => {
 
         {/* Content area */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <div className="md:col-span-3 flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Welcome to your Dashboard!</h2>
+            <Link href='/joinquiz' legacyBehavior>
+              <button className="py-2 px-4 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition">Join Quiz</button>
+            </Link>
+          </div>
           {/* Chart and Calendar */}
           <div className="md:col-span-2 bg-white p-4 shadow rounded-lg">
             <Line data={data} options={options} />
           </div>
           <div className="bg-white p-4 shadow rounded-lg">
-            <DayPicker />
+            <FullCalendar
+              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+              initialView="dayGridMonth"
+              editable
+              selectable
+              events={[
+                { title: 'Math Quiz', date: '2024-07-10' },
+                { title: 'Chemistry Quiz', date: '2024-07-15' },
+                { title: 'Physics Quiz', date: '2024-07-20' },
+              ]}
+            />
           </div>
 
           {/* Tables */}
