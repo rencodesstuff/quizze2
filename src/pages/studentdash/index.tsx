@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
 import { DayPicker } from 'react-day-picker';
@@ -33,35 +34,37 @@ const options = {
 };
 
 const StudentDashboard = () => {
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
+
   return (
     <div className="flex min-h-screen bg-gray-100">
       {/* Sidebar */}
-      <div className="w-64 bg-gray-800 text-white flex flex-col">
+      <div className={`fixed inset-y-0 left-0 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition duration-300 ease-in-out bg-gray-800 text-white w-64 z-30`}>
         <div className="p-6 text-2xl font-bold border-b border-gray-700">Quizze</div>
-        <nav className="flex-1 p-4">
-          <ul>
-            <li className="mb-2">
+        <nav className="flex-1 p-4 space-y-2">
+          <ul className="space-y-2">
+            <li>
               <Link href="/" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">Home</a>
               </Link>
             </li>
-            <li className="mb-2">
+            <li>
               <Link href="/profile" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">Profile</a>
               </Link>
             </li>
-            <li className="mb-2">
+            <li>
               <Link href="/inbox" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">Inbox</a>
               </Link>
             </li>
-            <li className="mb-2">
+            <li>
               <Link href="/settings" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">Settings</a>
               </Link>
             </li>
-            <li className="mt-auto mb-2">
-              <Link href="/" legacyBehavior>
+            <li className="mt-auto">
+              <Link href="/signin" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">Logout</a>
               </Link>
             </li>
@@ -70,16 +73,15 @@ const StudentDashboard = () => {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-y-auto p-4">
+      <div className="flex-1 flex flex-col p-4">
         {/* Navbar */}
         <div className="flex items-center justify-between bg-white p-4 shadow-md">
+          <button className="md:hidden text-black" onClick={() => setSidebarOpen(!isSidebarOpen)}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
+          </button>
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <div className="flex items-center">
-            <img
-              src="/ZabirHD.png"
-              alt="User profile"
-              className="w-10 h-10 rounded-full mr-4"
-            />
+            <img src="/ZabirHD.png" alt="User profile" className="w-10 h-10 rounded-full mr-4" />
             <div>
               <div className="font-bold">SWE22070001</div>
               <div className="text-gray-600">Software Engineering</div>
