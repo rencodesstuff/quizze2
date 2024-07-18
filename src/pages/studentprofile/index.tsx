@@ -11,6 +11,11 @@ const StudentProfile = () => {
     studentID: 'SWE22070001'
   });
 
+  const handleSave = () => {
+    // Placeholder for save logic
+    console.log('Profile saved:', profile);
+  };
+
   return (
     <div className="flex min-h-screen bg-gray-100">
       {/* Sidebar */}
@@ -143,6 +148,17 @@ const StudentProfile = () => {
                 </select>
               </div>
             </form>
+          </div>
+
+          {/* Save Button */}
+          <div className="flex justify-end mt-4">
+            <button
+              type="button"
+              onClick={handleSave}
+              className="py-2 px-4 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
+            >
+              Save
+            </button>
           </div>
         </div>
       </div>
