@@ -97,7 +97,7 @@ const StudentInbox = () => {
               <span>From: Professor Smith</span>
               <span>2024-07-15</span>
             </div>
-            <p className="text-gray-800">Don't forget about the upcoming quiz on Monday!</p>
+            <p className="text-gray-800">Don&apos;t forget about the upcoming quiz on Monday!</p>
             <div className="mt-6">
               <button className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition">
                 Reply
