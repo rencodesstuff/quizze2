@@ -1,19 +1,21 @@
 import Link from 'next/link';
 import { useState } from 'react';
 
-const StudentProfile = () => {
+const StudentSettings = () => {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
-  // Mock API data for user profile
-  const [profile, setProfile] = useState({
-    username: 'Syed Zabir',
-    email: 'syedzabir@student.gmi.edu.my',
-    studentID: 'SWE22070001'
+  // Mock API data for user settings
+  const [settings, setSettings] = useState({
+    emailNotifications: 'Enabled',
+    theme: 'Light',
+    language: 'English',
+    privacyMode: 'Public',
+    twoFactorAuth: 'Disabled'
   });
 
   const handleSave = () => {
     // Placeholder for save logic
-    console.log('Profile saved:', profile);
+    console.log('Settings saved:', settings);
   };
 
   return (
@@ -59,7 +61,7 @@ const StudentProfile = () => {
           <button className="md:hidden text-black" onClick={() => setSidebarOpen(!isSidebarOpen)}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
           </button>
-          <h1 className="text-2xl font-bold">Profile</h1>
+          <h1 className="text-2xl font-bold">Settings</h1>
           <div className="flex items-center">
             <img src="/ZabirHD.png" alt="User profile" className="w-10 h-10 rounded-full mr-4" />
             <div>
@@ -71,81 +73,96 @@ const StudentProfile = () => {
 
         {/* Content area */}
         <div className="flex-1 p-4 space-y-4">
-          <h2 className="text-2xl font-bold text-center mb-4">User Profile</h2>
+          <h2 className="text-2xl font-bold text-center mb-4">User Settings</h2>
 
-          {/* User Info */}
+          {/* General Settings */}
           <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold mb-4">User Information</h3>
+            <h3 className="text-lg font-semibold mb-4">General Settings</h3>
             <form className="space-y-4">
               <div>
-                <label htmlFor="username" className="block text-sm font-medium text-gray-700">Username</label>
-                <input
-                  type="text"
-                  id="username"
-                  value={profile.username}
-                  onChange={(e) => setProfile({ ...profile, username: e.target.value })}
+                <label htmlFor="emailNotifications" className="block text-sm font-medium text-gray-700">Email Notifications</label>
+                <select 
+                  id="emailNotifications"
+                  value={settings.emailNotifications}
+                  onChange={(e) => setSettings({ ...settings, emailNotifications: e.target.value })}
                   className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
-                <input
-                  type="email"
-                  id="email"
-                  value={profile.email}
-                  onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                  className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label htmlFor="studentID" className="block text-sm font-medium text-gray-700">Student ID</label>
-                <input
-                  type="text"
-                  id="studentID"
-                  value={profile.studentID}
-                  onChange={(e) => setProfile({ ...profile, studentID: e.target.value })}
-                  className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </form>
-          </div>
-
-          {/* Change Password */}
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold mb-4">Change Password</h3>
-            <form className="space-y-4">
-              <div>
-                <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700">Current Password</label>
-                <input type="password" id="currentPassword" className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-              <div>
-                <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">New Password</label>
-                <input type="password" id="newPassword" className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-              <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">Confirm Password</label>
-                <input type="password" id="confirmPassword" className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-              </div>
-            </form>
-          </div>
-
-          {/* Other Settings */}
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold mb-4">Other Settings</h3>
-            <form className="space-y-4">
-              <div>
-                <label htmlFor="notification" className="block text-sm font-medium text-gray-700">Email Notifications</label>
-                <select id="notification" className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                >
                   <option>Enabled</option>
                   <option>Disabled</option>
                 </select>
               </div>
               <div>
                 <label htmlFor="theme" className="block text-sm font-medium text-gray-700">Theme</label>
-                <select id="theme" className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <select 
+                  id="theme"
+                  value={settings.theme}
+                  onChange={(e) => setSettings({ ...settings, theme: e.target.value })}
+                  className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
                   <option>Light</option>
                   <option>Dark</option>
                 </select>
+              </div>
+              <div>
+                <label htmlFor="language" className="block text-sm font-medium text-gray-700">Language</label>
+                <select 
+                  id="language"
+                  value={settings.language}
+                  onChange={(e) => setSettings({ ...settings, language: e.target.value })}
+                  className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option>English</option>
+                  <option>Spanish</option>
+                  <option>French</option>
+                  <option>German</option>
+                </select>
+              </div>
+            </form>
+          </div>
+
+          {/* Privacy Settings */}
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <h3 className="text-lg font-semibold mb-4">Privacy Settings</h3>
+            <form className="space-y-4">
+              <div>
+                <label htmlFor="privacyMode" className="block text-sm font-medium text-gray-700">Profile Visibility</label>
+                <select 
+                  id="privacyMode"
+                  value={settings.privacyMode}
+                  onChange={(e) => setSettings({ ...settings, privacyMode: e.target.value })}
+                  className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option>Public</option>
+                  <option>Friends Only</option>
+                  <option>Private</option>
+                </select>
+              </div>
+            </form>
+          </div>
+
+          {/* Security Settings */}
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <h3 className="text-lg font-semibold mb-4">Security Settings</h3>
+            <form className="space-y-4">
+              <div>
+                <label htmlFor="twoFactorAuth" className="block text-sm font-medium text-gray-700">Two-Factor Authentication</label>
+                <select 
+                  id="twoFactorAuth"
+                  value={settings.twoFactorAuth}
+                  onChange={(e) => setSettings({ ...settings, twoFactorAuth: e.target.value })}
+                  className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option>Enabled</option>
+                  <option>Disabled</option>
+                </select>
+              </div>
+              <div>
+                <button
+                  type="button"
+                  className="mt-2 py-2 px-4 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 transition"
+                >
+                  Change Password
+                </button>
               </div>
             </form>
           </div>
@@ -157,7 +174,7 @@ const StudentProfile = () => {
               onClick={handleSave}
               className="py-2 px-4 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
             >
-              Save
+              Save Settings
             </button>
           </div>
         </div>
@@ -166,4 +183,4 @@ const StudentProfile = () => {
   );
 };
 
-export default StudentProfile;
+export default StudentSettings;

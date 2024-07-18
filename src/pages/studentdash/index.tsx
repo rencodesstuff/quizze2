@@ -57,12 +57,12 @@ const StudentDashboard = () => {
               </Link>
             </li>
             <li>
-              <Link href="/inbox" legacyBehavior>
+              <Link href="/stdinbox" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">Inbox</a>
               </Link>
             </li>
             <li>
-              <Link href="/settings" legacyBehavior>
+              <Link href="/stdsettings" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">Settings</a>
               </Link>
             </li>
