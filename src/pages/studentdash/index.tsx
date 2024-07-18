@@ -47,12 +47,12 @@ const StudentDashboard = () => {
         <nav className="flex-1 p-4 space-y-2">
           <ul className="space-y-2">
             <li>
-              <Link href="/" legacyBehavior>
+              <Link href="/studentdash" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">Home</a>
               </Link>
             </li>
             <li>
-              <Link href="/profile" legacyBehavior>
+              <Link href="/studentprofile" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">Profile</a>
               </Link>
             </li>
