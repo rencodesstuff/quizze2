@@ -47,8 +47,8 @@ const TeacherDashboard = () => {
         <nav className="flex-1 p-4 space-y-2">
           <ul className="space-y-2">
             <li>
-              <Link href="/teacherdash" legacyBehavior>
-                <a className="block p-2 rounded hover:bg-gray-700">Dashboard</a>
+              <Link href="/teachdash" legacyBehavior>
+                <a className="block p-2 rounded hover:bg-gray-700">Home</a>
               </Link>
             </li>
             <li>
@@ -62,7 +62,7 @@ const TeacherDashboard = () => {
               </Link>
             </li>
             <li>
-              <Link href="/studentscores" legacyBehavior>
+              <Link href="/stdscores" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">Student Scores</a>
               </Link>
             </li>
@@ -106,9 +106,6 @@ const TeacherDashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           <div className="md:col-span-3 flex justify-between items-center">
             <h2 className="text-2xl font-bold">Welcome, Dr. Smith!</h2>
-            <Link href='/createquiz' legacyBehavior>
-              <button className="py-2 px-4 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition">Create New Quiz</button>
-            </Link>
           </div>
           
           {/* Chart and Calendar */}
@@ -212,10 +209,6 @@ const TeacherDashboard = () => {
               <li className="flex items-center justify-between">
                 <span>Syasya</span>
                 <span className="bg-blue-200 text-blue-800 px-2 py-1 rounded">88%</span>
-              </li>
-              <li className="flex items-center justify-between">
-                <span>Alex Lee</span>
-                <span className="bg-blue-200 text-blue-800 px-2 py-1 rounded">87%</span>
               </li>
             </ul>
           </div>
