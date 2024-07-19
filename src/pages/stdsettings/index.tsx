@@ -3,6 +3,13 @@ import { useState } from 'react';
 
 const StudentSettings = () => {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('general');
+
+  const tabs = [
+    { id: 'general', label: 'General' },
+    { id: 'privacy', label: 'Privacy' },
+    { id: 'security', label: 'Security' },
+  ];
 
   // Mock API data for user settings
   const [settings, setSettings] = useState({
@@ -73,108 +80,128 @@ const StudentSettings = () => {
 
         {/* Content area */}
         <div className="flex-1 p-4 space-y-4">
-          <h2 className="text-2xl font-bold text-center mb-4">User Settings</h2>
+          <div className="bg-white shadow rounded-lg overflow-hidden">
+            <div className="border-b border-gray-200">
+              <nav className="-mb-px flex">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    className={`whitespace-nowrap py-4 px-8 border-b-2 font-medium text-sm ${
+                      activeTab === tab.id
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                    onClick={() => setActiveTab(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
 
-          {/* General Settings */}
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold mb-4">General Settings</h3>
-            <form className="space-y-4">
-              <div>
-                <label htmlFor="emailNotifications" className="block text-sm font-medium text-gray-700">Email Notifications</label>
-                <select 
-                  id="emailNotifications"
-                  value={settings.emailNotifications}
-                  onChange={(e) => setSettings({ ...settings, emailNotifications: e.target.value })}
-                  className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option>Enabled</option>
-                  <option>Disabled</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="theme" className="block text-sm font-medium text-gray-700">Theme</label>
-                <select 
-                  id="theme"
-                  value={settings.theme}
-                  onChange={(e) => setSettings({ ...settings, theme: e.target.value })}
-                  className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option>Light</option>
-                  <option>Dark</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="language" className="block text-sm font-medium text-gray-700">Language</label>
-                <select 
-                  id="language"
-                  value={settings.language}
-                  onChange={(e) => setSettings({ ...settings, language: e.target.value })}
-                  className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option>English</option>
-                  <option>Spanish</option>
-                  <option>French</option>
-                  <option>German</option>
-                </select>
-              </div>
-            </form>
-          </div>
+            <div className="p-8">
+              {activeTab === 'general' && (
+                <div className="space-y-6">
+                  <div>
+                    <label htmlFor="emailNotifications" className="block text-sm font-medium text-gray-700">Email Notifications</label>
+                    <select 
+                      id="emailNotifications"
+                      value={settings.emailNotifications}
+                      onChange={(e) => setSettings({ ...settings, emailNotifications: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    >
+                      <option>Enabled</option>
+                      <option>Disabled</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="theme" className="block text-sm font-medium text-gray-700">Theme</label>
+                    <select 
+                      id="theme"
+                      value={settings.theme}
+                      onChange={(e) => setSettings({ ...settings, theme: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    >
+                      <option>Light</option>
+                      <option>Dark</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="language" className="block text-sm font-medium text-gray-700">Language</label>
+                    <select 
+                      id="language"
+                      value={settings.language}
+                      onChange={(e) => setSettings({ ...settings, language: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    >
+                      <option>English</option>
+                      <option>Spanish</option>
+                      <option>French</option>
+                      <option>German</option>
+                    </select>
+                  </div>
+                </div>
+              )}
 
-          {/* Privacy Settings */}
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold mb-4">Privacy Settings</h3>
-            <form className="space-y-4">
-              <div>
-                <label htmlFor="privacyMode" className="block text-sm font-medium text-gray-700">Profile Visibility</label>
-                <select 
-                  id="privacyMode"
-                  value={settings.privacyMode}
-                  onChange={(e) => setSettings({ ...settings, privacyMode: e.target.value })}
-                  className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option>Public</option>
-                  <option>Friends Only</option>
-                  <option>Private</option>
-                </select>
-              </div>
-            </form>
-          </div>
+              {activeTab === 'privacy' && (
+                <div className="space-y-6">
+                  <div>
+                    <label htmlFor="privacyMode" className="block text-sm font-medium text-gray-700">Profile Visibility</label>
+                    <select 
+                      id="privacyMode"
+                      value={settings.privacyMode}
+                      onChange={(e) => setSettings({ ...settings, privacyMode: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    >
+                      <option>Public</option>
+                      <option>Friends Only</option>
+                      <option>Private</option>
+                    </select>
+                  </div>
+                </div>
+              )}
 
-          {/* Security Settings */}
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold mb-4">Security Settings</h3>
-            <form className="space-y-4">
-              <div>
-                <label htmlFor="twoFactorAuth" className="block text-sm font-medium text-gray-700">Two-Factor Authentication</label>
-                <select 
-                  id="twoFactorAuth"
-                  value={settings.twoFactorAuth}
-                  onChange={(e) => setSettings({ ...settings, twoFactorAuth: e.target.value })}
-                  className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option>Enabled</option>
-                  <option>Disabled</option>
-                </select>
-              </div>
-              <div>
-                <button
-                  type="button"
-                  className="mt-2 py-2 px-4 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 transition"
-                >
-                  Change Password
-                </button>
-              </div>
-            </form>
+              {activeTab === 'security' && (
+                <div className="space-y-6">
+                  <div>
+                    <label htmlFor="twoFactorAuth" className="block text-sm font-medium text-gray-700">Two-Factor Authentication</label>
+                    <select 
+                      id="twoFactorAuth"
+                      value={settings.twoFactorAuth}
+                      onChange={(e) => setSettings({ ...settings, twoFactorAuth: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    >
+                      <option>Enabled</option>
+                      <option>Disabled</option>
+                    </select>
+                  </div>
+                  <div>
+                    <button
+                      type="button"
+                      className="mt-2 py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      Change Password
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Save Button */}
-          <div className="flex justify-end mt-4">
+          <div className="flex justify-end space-x-4">
+            <button
+              type="button"
+              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Cancel
+            </button>
             <button
               type="button"
               onClick={handleSave}
-              className="py-2 px-4 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
-              Save Settings
+              Save Changes
             </button>
           </div>
         </div>

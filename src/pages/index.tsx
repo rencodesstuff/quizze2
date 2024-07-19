@@ -1,10 +1,38 @@
+// src/pages/index.tsx
 import Link from "next/link";
 import { TypewriterEffect } from "@/ui/typewriter-effect";
 import Image from "next/image";
+import { InfiniteMovingCards } from "@/ui/infinite-moving-cards";
+
+const testimonials = [
+  {
+    quote: "Quizze has completely transformed my study routine. The quizzes are engaging and cover a wide range of topics. Highly recommend it to all students!",
+    name: "Mohamed Fawwaz",
+    title: "Software Engineering",
+  },
+  {
+    quote: "The interactive quizzes on Quizze make learning fun and effective. It's a great way to test your knowledge and prepare for exams.",
+    name: "Zarif Danish",
+    title: "Process and Instrumental Control",
+  },
+  {
+    quote: "I love how Quizze offers quizzes on various subjects. It's a perfect tool for self-assessment and improvement. A must-have for every student!",
+    name: "Arifin Densumite",
+    title: "Software Engineering",
+  },
+  {
+    quote: "Quizze helped me ace my exams! The diverse topics and challenging questions are exactly what I needed to stay on top of my studies.",
+    name: "Fawwaz Amin",
+    title: "Creative Multimedia",
+  },
+  {
+    quote: "The quizzes are not only fun but also very informative. Quizze is my go-to platform for quick revision and self-evaluation.",
+    name: "Afiq Danish",
+    title: "Network Security",
+  },
+];
 
 export default function Home() {
-
-  {/* Typewriter Words */ }
   const words = [
     { text: "Challenge" },
     { text: "your" },
@@ -14,7 +42,6 @@ export default function Home() {
     { text: "your" },
     { text: "mind", className: "text-blue-500 dark:text-blue-500" },
   ];
-
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -34,7 +61,6 @@ export default function Home() {
             <h2 className="text-5xl font-extrabold mb-4">The Ultimate Quiz Experience</h2>
             <TypewriterEffect words={words} />
             <div className="mt-6 space-x-4">
-
               <Link legacyBehavior href="/signin">
                 <a className="inline-block px-6 py-3 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition">
                   Sign In
@@ -152,7 +178,7 @@ export default function Home() {
             </h2>
             <p className="mt-4 text-lg text-gray-700 dark:text-gray-300">
               Engage, learn, and excel. At , we believe there is a better way to
-              meet our clients&apos; needs. We&apos;re a company that exists to help you
+              meet our clients' needs. We're a company that exists to help you
               achieve more than you ever thought possible.
             </p>
             <p className="mt-4 text-gray-600 dark:text-gray-400">
@@ -162,7 +188,7 @@ export default function Home() {
               useful as they are memorable.
             </p>
             <p className="mt-4 mb-6 text-gray-600 dark:text-gray-400">
-              Let&apos;s do great things together. We can&apos;t wait to work with you.
+              Let's do great things together. We can't wait to work with you.
             </p>
             <Link legacyBehavior href="/contact">
               <a className="px-6 py-3 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition">
@@ -188,18 +214,7 @@ export default function Home() {
             <p className="mt-4 text-lg text-gray-700 dark:text-gray-300">
               Hear from our satisfied users who love Quizze.
             </p>
-            <div className="mt-8 max-w-xl mx-auto">
-              <p className="text-gray-700 dark:text-gray-300">
-                &quot;The attention and effort Quizze puts into creating engaging
-                quizzes is unmatched. I love the variety of topics and the
-                challenging questions. It&apos;s my go-to for a fun and educational
-                experience!&quot;
-              </p>
-              <div className="mt-4 text-red-500">★★★★★</div>
-              <p className="mt-2 text-gray-900 dark:text-white font-semibold">
-                - Best Quiz Ever
-              </p>
-            </div>
+            <InfiniteMovingCards items={testimonials} direction="right" speed="slow" />
           </div>
         </section>
       </main>

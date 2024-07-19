@@ -67,12 +67,12 @@ const TeacherDashboard = () => {
               </Link>
             </li>
             <li>
-              <Link href="/teacherprofile" legacyBehavior>
+              <Link href="/teachprofile" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">Profile</a>
               </Link>
             </li>
             <li>
-              <Link href="/settings" legacyBehavior>
+              <Link href="/teachsettings" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">Settings</a>
               </Link>
             </li>

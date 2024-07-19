@@ -14,10 +14,10 @@ const TeacherStudentScores = () => {
 
   // Mock data for classes
   const classes: ClassType[] = [
-    { id: 1, name: 'Mathematics 101', students: 30, averageScore: 85 },
-    { id: 2, name: 'Physics 202', students: 25, averageScore: 78 },
-    { id: 3, name: 'Computer Science 303', students: 35, averageScore: 92 },
-    { id: 4, name: 'Chemistry 104', students: 28, averageScore: 80 },
+    { id: 1, name: 'STT 2263', students: 30, averageScore: 85 },
+    { id: 2, name: 'CIT 0163', students: 25, averageScore: 78 },
+    { id: 3, name: 'STT 0519', students: 35, averageScore: 92 },
+    { id: 4, name: 'CIT 0112', students: 28, averageScore: 80 },
   ];
 
   return (
@@ -26,35 +26,40 @@ const TeacherStudentScores = () => {
       <div className={`fixed inset-y-0 left-0 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition duration-300 ease-in-out bg-gray-800 text-white w-64 z-30`}>
         <div className="p-6 text-2xl font-bold border-b border-gray-700">Quizze</div>
         <nav className="flex-1 p-4 space-y-2">
-          <ul className="space-y-2">
+        <ul className="space-y-2">
             <li>
-              <Link href="/teacherdash" className="block p-2 rounded hover:bg-gray-700">
-                Dashboard
+              <Link href="/teachdash" legacyBehavior>
+                <a className="block p-2 rounded hover:bg-gray-700">Home</a>
               </Link>
             </li>
             <li>
-              <Link href="/createquiz" className="block p-2 rounded hover:bg-gray-700">
-                Create Quiz
+              <Link href="/createquiz" legacyBehavior>
+                <a className="block p-2 rounded hover:bg-gray-700">Create Quiz</a>
               </Link>
             </li>
             <li>
-              <Link href="/studentscores" className="block p-2 rounded hover:bg-gray-700">
-                Student Scores
+              <Link href="/myquizzes" legacyBehavior>
+                <a className="block p-2 rounded hover:bg-gray-700">My Quizzes</a>
               </Link>
             </li>
             <li>
-              <Link href="/teacherprofile" className="block p-2 rounded hover:bg-gray-700">
-                Profile
+              <Link href="/stdscores" legacyBehavior>
+                <a className="block p-2 rounded hover:bg-gray-700">Student Scores</a>
               </Link>
             </li>
             <li>
-              <Link href="/settings" className="block p-2 rounded hover:bg-gray-700">
-                Settings
+              <Link href="/teacherprofile" legacyBehavior>
+                <a className="block p-2 rounded hover:bg-gray-700">Profile</a>
+              </Link>
+            </li>
+            <li>
+              <Link href="/teachsettings" legacyBehavior>
+                <a className="block p-2 rounded hover:bg-gray-700">Settings</a>
               </Link>
             </li>
             <li className="mt-auto">
-              <Link href="/signin" className="block p-2 rounded hover:bg-gray-700">
-                Logout
+              <Link href="/signin" legacyBehavior>
+                <a className="block p-2 rounded hover:bg-gray-700">Logout</a>
               </Link>
             </li>
           </ul>
@@ -73,7 +78,7 @@ const TeacherStudentScores = () => {
             <img src="/TeacherAvatar.png" alt="Teacher profile" className="w-10 h-10 rounded-full mr-4" />
             <div>
               <div className="font-bold">Dr. Smith</div>
-              <div className="text-gray-600">Computer Science</div>
+              <div className="text-gray-600">Software Engineering</div>
             </div>
           </div>
         </div>
@@ -126,17 +131,17 @@ const TeacherStudentScores = () => {
                   </thead>
                   <tbody>
                     <tr>
-                      <td className="border-t px-4 py-2">John Doe</td>
+                      <td className="border-t px-4 py-2">Zabir</td>
                       <td className="border-t px-4 py-2">95%</td>
                       <td className="border-t px-4 py-2">2024-07-15</td>
                     </tr>
                     <tr>
-                      <td className="border-t px-4 py-2">Jane Smith</td>
+                      <td className="border-t px-4 py-2">Shahmi</td>
                       <td className="border-t px-4 py-2">88%</td>
                       <td className="border-t px-4 py-2">2024-07-15</td>
                     </tr>
                     <tr>
-                      <td className="border-t px-4 py-2">Mike Johnson</td>
+                      <td className="border-t px-4 py-2">Syasya</td>
                       <td className="border-t px-4 py-2">92%</td>
                       <td className="border-t px-4 py-2">2024-07-15</td>
                     </tr>
