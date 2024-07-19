@@ -6,9 +6,11 @@ const GradientCanvas = () => {
   const canvasRef = useRef(null);
 
   useEffect(() => {
-    const gradient = new Gradient();
-    gradient.initGradient("#gradient-canvas");
-
+    if(canvasRef.current){
+      const gradient = new Gradient();
+      gradient.initGradient("#gradient-canvas");
+    }
+   
     return () => {
       // Clean up if necessary
     };

@@ -585,22 +585,31 @@ class Gradient {
           requestAnimationFrame(this.animate);
       }),
       e(this, "addIsLoadedClass", () => {
-        /*this.isIntersecting && */ !this.isLoadedClass &&
-          ((this.isLoadedClass = !0),
-          this.el.classList.add("isLoaded"),
+        if (this.el) {
+          this.el.classList.add("isLoaded");
           setTimeout(() => {
-            this.el.parentElement.classList.add("isLoaded");
-          }, 3e3));
-      }),
-      e(this, "pause", () => {
-        this.conf.playing = false;
-      }),
+            if (this.el && this.el.parentElement) {
+              this.el.parentElement.classList.add("isLoaded");
+            }
+          }, 3000);
+        }
+      });
+    e(this, "pause", () => {
+      this.conf.playing = false;
+    }),
       e(this, "play", () => {
         requestAnimationFrame(this.animate), (this.conf.playing = true);
       }),
       e(this, "initGradient", (selector) => {
-        this.el = document.querySelector(selector);
-        this.connect();
+        this.el =
+          typeof selector === "string"
+            ? document.querySelector(selector)
+            : selector;
+        if (this.el) {
+          this.connect();
+        } else {
+          console.error(`Element with selector "${selector}" not found.`);
+        }
         return this;
       });
   }
@@ -631,7 +640,7 @@ class Gradient {
               ((this.computedCanvasStyle = getComputedStyle(this.el)),
               this.waitForCssVars());
           }));
-          /*
+    /*
           this.scrollObserver = await s.create(.1, !1),
           this.scrollObserver.observe(this.el),
           this.scrollObserver.onSeparate(() => {
