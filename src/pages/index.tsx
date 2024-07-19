@@ -177,8 +177,8 @@ export default function Home() {
               Interactive Quiz Platform
             </h2>
             <p className="mt-4 text-lg text-gray-700 dark:text-gray-300">
-              Engage, learn, and excel. At , we believe there is a better way to
-              meet our clients' needs. We're a company that exists to help you
+              Engage, learn, and excel. At Quizze, we believe there is a better way to
+              meet our clients&apos; needs. We&apos;re a company that exists to help you
               achieve more than you ever thought possible.
             </p>
             <p className="mt-4 text-gray-600 dark:text-gray-400">
@@ -188,7 +188,7 @@ export default function Home() {
               useful as they are memorable.
             </p>
             <p className="mt-4 mb-6 text-gray-600 dark:text-gray-400">
-              Let's do great things together. We can't wait to work with you.
+              Let&apos;s do great things together. We can&apos;t wait to work with you.
             </p>
             <Link legacyBehavior href="/contact">
               <a className="px-6 py-3 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition">
