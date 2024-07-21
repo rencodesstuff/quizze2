@@ -26,7 +26,7 @@ const TeacherStudentScores = () => {
       <div className={`fixed inset-y-0 left-0 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition duration-300 ease-in-out bg-gray-800 text-white w-64 z-30`}>
         <div className="p-6 text-2xl font-bold border-b border-gray-700">Quizze</div>
         <nav className="flex-1 p-4 space-y-2">
-        <ul className="space-y-2">
+          <ul className="space-y-2">
             <li>
               <Link href="/teachdash" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">Home</a>
@@ -38,7 +38,7 @@ const TeacherStudentScores = () => {
               </Link>
             </li>
             <li>
-              <Link href="/myquizzes" legacyBehavior>
+              <Link href="/teachquiz" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">My Quizzes</a>
               </Link>
             </li>
@@ -48,7 +48,7 @@ const TeacherStudentScores = () => {
               </Link>
             </li>
             <li>
-              <Link href="/teacherprofile" legacyBehavior>
+              <Link href="/teachprofile" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">Profile</a>
               </Link>
             </li>

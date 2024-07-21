@@ -57,7 +57,7 @@ const TeacherDashboard = () => {
               </Link>
             </li>
             <li>
-              <Link href="/myquizzes" legacyBehavior>
+              <Link href="/teachquiz" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">My Quizzes</a>
               </Link>
             </li>
