@@ -17,8 +17,8 @@ const testimonials = [
   },
   {
     quote: "I love how Quizze offers quizzes on various subjects. It's a perfect tool for self-assessment and improvement. A must-have for every student!",
-    name: "Arifin Densumite",
-    title: "Software Engineering",
+    name: "Aadam Sahib",
+    title: "Sound Engineering",
   },
   {
     quote: "Quizze helped me ace my exams! The diverse topics and challenging questions are exactly what I needed to stay on top of my studies.",
@@ -27,7 +27,7 @@ const testimonials = [
   },
   {
     quote: "The quizzes are not only fun but also very informative. Quizze is my go-to platform for quick revision and self-evaluation.",
-    name: "Afiq Danish",
+    name: "Shahmi Naufal",
     title: "Network Security",
   },
 ];
