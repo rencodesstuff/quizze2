@@ -38,6 +38,11 @@ const StudentSettings = () => {
               </Link>
             </li>
             <li>
+              <Link href="/stdquiz" legacyBehavior>
+                <a className="block p-2 rounded hover:bg-gray-700">My Quiz</a>
+              </Link>
+            </li>
+            <li>
               <Link href="/studentprofile" legacyBehavior>
                 <a className="block p-2 rounded hover:bg-gray-700">Profile</a>
               </Link>

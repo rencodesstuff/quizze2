@@ -66,24 +66,18 @@ const TeacherProfile = () => {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col p-4">
         {/* Navbar */}
-        <div className="bg-white shadow-md">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-6 md:justify-start md:space-x-10">
-              <div className="flex justify-start lg:w-0 lg:flex-1">
-                <button className="md:hidden text-gray-500" onClick={() => setSidebarOpen(!isSidebarOpen)}>
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
-                </button>
-                <h1 className="text-2xl font-bold text-gray-900">Teacher Profile</h1>
-              </div>
-              <div className="flex items-center">
-                <img src="/teacher-avatar.png" alt="Teacher profile" className="w-10 h-10 rounded-full mr-4" />
-                <div>
-                  <div className="font-bold text-gray-900">{profile.name}</div>
-                  <div className="text-sm text-gray-600">{profile.department}</div>
-                </div>
-              </div>
+        <div className="flex items-center justify-between bg-white p-4 shadow-md">
+          <button className="md:hidden text-black" onClick={() => setSidebarOpen(!isSidebarOpen)}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
+          </button>
+          <h1 className="text-2xl font-bold">Teacher Profile</h1>
+          <div className="flex items-center">
+            <img src="/TeacherAvatar.png" alt="Teacher profile" className="w-10 h-10 rounded-full mr-4" />
+            <div>
+              <div className="font-bold">Dr. Smith</div>
+              <div className="text-gray-600">Software Engineering</div>
             </div>
           </div>
         </div>
@@ -145,7 +139,7 @@ const TeacherProfile = () => {
               <button
                 type="button"
                 onClick={handleSave}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Save Changes
               </button>

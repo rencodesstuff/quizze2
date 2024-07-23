@@ -27,28 +27,33 @@ const StudentProfile = () => {
         <nav className="flex-1 p-4 space-y-2">
           <ul className="space-y-2">
             <li>
-              <Link href="/studentdash" className="block p-2 rounded hover:bg-gray-700 transition">
-                Home
+              <Link href="/studentdash" legacyBehavior>
+                <a className="block p-2 rounded hover:bg-gray-700">Home</a>
               </Link>
             </li>
             <li>
-              <Link href="/studentprofile" className="block p-2 rounded hover:bg-gray-700 transition">
-                Profile
+              <Link href="/stdquiz" legacyBehavior>
+                <a className="block p-2 rounded hover:bg-gray-700">My Quiz</a>
               </Link>
             </li>
             <li>
-              <Link href="/stdinbox" className="block p-2 rounded hover:bg-gray-700 transition">
-                Inbox
+              <Link href="/studentprofile" legacyBehavior>
+                <a className="block p-2 rounded hover:bg-gray-700">Profile</a>
               </Link>
             </li>
             <li>
-              <Link href="/stdsettings" className="block p-2 rounded hover:bg-gray-700 transition">
-                Settings
+              <Link href="/stdinbox" legacyBehavior>
+                <a className="block p-2 rounded hover:bg-gray-700">Inbox</a>
+              </Link>
+            </li>
+            <li>
+              <Link href="/stdsettings" legacyBehavior>
+                <a className="block p-2 rounded hover:bg-gray-700">Settings</a>
               </Link>
             </li>
             <li className="mt-auto">
-              <Link href="/signin" className="block p-2 rounded hover:bg-gray-700 transition">
-                Logout
+              <Link href="/signin" legacyBehavior>
+                <a className="block p-2 rounded hover:bg-gray-700">Logout</a>
               </Link>
             </li>
           </ul>
