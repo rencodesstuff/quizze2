@@ -47,7 +47,7 @@ const teamMembers = [
   {
     name: "Shahmi",
     role: "Head Software Tester",
-    img: "/path/to/alice.jpg",
+    img: "/ShahmiHD.png",
   },
   {
     name: "Syasya",
