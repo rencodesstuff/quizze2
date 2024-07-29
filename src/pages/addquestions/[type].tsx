@@ -4,18 +4,22 @@ const QuestionTypePage = () => {
   const router = useRouter();
   const { type } = router.query;
 
-  const renderQuestionType = () => {
-    switch (type) {
-      case 'multiple-choice':
-        return <div>Multiple Choice Question</div>;
-      case 'true-false':
-        return <div>True/False Question</div>;
-      case 'short-answer':
-        return <div>Short Answer Question</div>;
-      default:
-        return <div>Invalid Question Type</div>;
-    }
-  };
+const renderQuestionType = () => {
+  switch (type) {
+    case 'multiple-choice':
+      return <div>Multiple Choice Question</div>;
+    case 'true-false':
+      return <div>True/False Question</div>;
+    case 'short-answer':
+      return <div>Short Answer Question</div>;
+    case 'drag-and-drop':
+      return <div>Drag and Drop Question</div>;
+    case 'matching':
+      return <div>Matching Question</div>;
+    default:
+      return <div>Invalid Question Type</div>;
+  }
+};
 
   return (
     <div>

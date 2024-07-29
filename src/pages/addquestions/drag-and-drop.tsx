@@ -1,9 +1,22 @@
-import Link from "next/link";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { useState, ChangeEvent, useEffect } from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+} from "react-beautiful-dnd";
 
-const AddQuestionsPage = () => {
+const DragAndDropQuestionPage = () => {
   const router = useRouter();
+  const [question, setQuestion] = useState("");
+  const [items, setItems] = useState([
+    { id: "item1", content: "Item 1" },
+    { id: "item2", content: "Item 2" },
+    { id: "item3", content: "Item 3" },
+  ]);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -19,7 +32,6 @@ const AddQuestionsPage = () => {
   }, [isSidebarOpen]);
 
   const handleClickOutside = (event: MouseEvent) => {
-    if (!event.target) return;
     const targetElement = event.target as HTMLElement;
     if (
       !targetElement.closest(".sidebar") &&
@@ -29,18 +41,17 @@ const AddQuestionsPage = () => {
     }
   };
 
-  const [selectedType, setSelectedType] = useState("");
-
-  const handleSelectionChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    setSelectedType(event.target.value);
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    const newItems = Array.from(items);
+    const [reorderedItem] = newItems.splice(result.source.index, 1);
+    newItems.splice(result.destination.index, 0, reorderedItem);
+    setItems(newItems);
   };
 
-  const handleAddQuestionClick = () => {
-    if (selectedType) {
-      router.push(`/addquestions/${selectedType}`);
-    } else {
-      alert("Please select a question type");
-    }
+  const handleSave = () => {
+    console.log({ question, items });
+    alert("Question saved!");
   };
 
   return (
@@ -221,30 +232,10 @@ const AddQuestionsPage = () => {
         </nav>
       </div>
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col p-4">
         {/* Navbar */}
         <div className="flex items-center justify-between bg-white p-4 shadow-md">
-          <button
-            className="md:hidden text-black"
-            onClick={() => setSidebarOpen(!isSidebarOpen)}
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16m-7 6h7"
-              />
-            </svg>
-          </button>
-          <h1 className="text-2xl font-bold">Add Questions</h1>
+          <h1 className="text-2xl font-bold">Add Multiple Choice Question</h1>
           <div className="flex items-center">
             <img
               src="/ZabirHD.png"
@@ -257,36 +248,68 @@ const AddQuestionsPage = () => {
             </div>
           </div>
         </div>
-
-        {/* Content area */}
-        <div className="flex-1 p-4 space-y-4">
-          <h2 className="text-2xl font-bold text-center mb-4">Add Questions</h2>
-
-          {/* Dropdown to select question type */}
-          <div className="flex justify-center">
-            <select
-              value={selectedType}
-              onChange={handleSelectionChange}
-              className="block p-2 border rounded"
-            >
-              <option value="">Select a type</option>
-              <option value="multiple-choice">Multiple Choice</option>
-              <option value="true-false">True/False</option>
-              <option value="short-answer">Short Answer</option>
-              <option value="drag-and-drop">Drag and Drop</option>
-              <option value="matching">Matching</option>
-            </select>
-            <button
-              onClick={handleAddQuestionClick}
-              className="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Add Question
-            </button>
-          </div>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="flex-1 p-4 space-y-4"
+        >
+          <h2 className="text-xl font-bold">Question</h2>
+          <textarea
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            className="w-full p-2 border rounded"
+            rows={4}
+            placeholder="Enter the question here"
+          />
+          <h2 className="text-xl font-bold">Drag and Drop Items</h2>
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="items">
+              {(provided) => (
+                <ul {...provided.droppableProps} ref={provided.innerRef}>
+                  {items.map((item, index) => (
+                    <Draggable
+                      key={item.id}
+                      draggableId={item.id}
+                      index={index}
+                    >
+                      {(provided) => (
+                        <li
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          className="p-2 mb-2 bg-white rounded shadow"
+                        >
+                          {item.content}
+                        </li>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </ul>
+              )}
+            </Droppable>
+          </DragDropContext>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleSave}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mr-2"
+          >
+            Save Question
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => router.push("preview-questions")}
+            className="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            Preview Questions
+          </motion.button>
+        </motion.div>
       </div>
     </div>
   );
 };
 
-export default AddQuestionsPage;
+export default DragAndDropQuestionPage;

@@ -1,9 +1,15 @@
-import Link from "next/link";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { useState, ChangeEvent, useEffect } from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
 
-const AddQuestionsPage = () => {
+const MatchingQuestionPage = () => {
   const router = useRouter();
+  const [question, setQuestion] = useState("");
+  const [pairs, setPairs] = useState([
+    { id: 1, left: "", right: "" },
+    { id: 2, left: "", right: "" },
+  ]);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -19,7 +25,6 @@ const AddQuestionsPage = () => {
   }, [isSidebarOpen]);
 
   const handleClickOutside = (event: MouseEvent) => {
-    if (!event.target) return;
     const targetElement = event.target as HTMLElement;
     if (
       !targetElement.closest(".sidebar") &&
@@ -29,23 +34,29 @@ const AddQuestionsPage = () => {
     }
   };
 
-  const [selectedType, setSelectedType] = useState("");
-
-  const handleSelectionChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    setSelectedType(event.target.value);
+  const handleAddPair = () => {
+    setPairs([...pairs, { id: pairs.length + 1, left: "", right: "" }]);
   };
 
-  const handleAddQuestionClick = () => {
-    if (selectedType) {
-      router.push(`/addquestions/${selectedType}`);
-    } else {
-      alert("Please select a question type");
-    }
+  const handlePairChange = (
+    id: number,
+    side: "left" | "right",
+    value: string
+  ) => {
+    const newPairs = pairs.map((pair) =>
+      pair.id === id ? { ...pair, [side]: value } : pair
+    );
+    setPairs(newPairs);
+  };
+
+  const handleSave = () => {
+    console.log({ question, pairs });
+    alert("Question saved!");
   };
 
   return (
     <div className="flex min-h-screen bg-gray-100">
-      {/* Sidebar */}
+      {/* Sidebar (same as in previous examples) */}
       <div
         className={`sidebar fixed inset-y-0 left-0 transform ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -221,30 +232,10 @@ const AddQuestionsPage = () => {
         </nav>
       </div>
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col p-4">
         {/* Navbar */}
         <div className="flex items-center justify-between bg-white p-4 shadow-md">
-          <button
-            className="md:hidden text-black"
-            onClick={() => setSidebarOpen(!isSidebarOpen)}
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16m-7 6h7"
-              />
-            </svg>
-          </button>
-          <h1 className="text-2xl font-bold">Add Questions</h1>
+          <h1 className="text-2xl font-bold">Add Matching Question</h1>
           <div className="flex items-center">
             <img
               src="/ZabirHD.png"
@@ -257,36 +248,77 @@ const AddQuestionsPage = () => {
             </div>
           </div>
         </div>
-
-        {/* Content area */}
-        <div className="flex-1 p-4 space-y-4">
-          <h2 className="text-2xl font-bold text-center mb-4">Add Questions</h2>
-
-          {/* Dropdown to select question type */}
-          <div className="flex justify-center">
-            <select
-              value={selectedType}
-              onChange={handleSelectionChange}
-              className="block p-2 border rounded"
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="flex-1 p-4 space-y-4"
+        >
+          <h2 className="text-xl font-bold">Question</h2>
+          <textarea
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            className="w-full p-2 border rounded"
+            rows={4}
+            placeholder="Enter the question here"
+          />
+          <h2 className="text-xl font-bold">Matching Pairs</h2>
+          {pairs.map((pair) => (
+            <motion.div
+              key={pair.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex space-x-2"
             >
-              <option value="">Select a type</option>
-              <option value="multiple-choice">Multiple Choice</option>
-              <option value="true-false">True/False</option>
-              <option value="short-answer">Short Answer</option>
-              <option value="drag-and-drop">Drag and Drop</option>
-              <option value="matching">Matching</option>
-            </select>
-            <button
-              onClick={handleAddQuestionClick}
-              className="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Add Question
-            </button>
-          </div>
-        </div>
+              <input
+                type="text"
+                value={pair.left}
+                onChange={(e) =>
+                  handlePairChange(pair.id, "left", e.target.value)
+                }
+                className="w-1/2 p-2 border rounded"
+                placeholder="Left item"
+              />
+              <input
+                type="text"
+                value={pair.right}
+                onChange={(e) =>
+                  handlePairChange(pair.id, "right", e.target.value)
+                }
+                className="w-1/2 p-2 border rounded"
+                placeholder="Right item"
+              />
+            </motion.div>
+          ))}
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleAddPair}
+            className="mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+          >
+            Add Pair
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleSave}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mr-2"
+          >
+            Save Question
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => router.push("preview-questions")}
+            className="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            Preview Questions
+          </motion.button>
+        </motion.div>
       </div>
     </div>
   );
 };
 
-export default AddQuestionsPage;
+export default MatchingQuestionPage;

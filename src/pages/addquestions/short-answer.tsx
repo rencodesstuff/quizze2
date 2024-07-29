@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import Link from 'next/link';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import Link from "next/link";
+import { motion } from "framer-motion";
 
 const ShortAnswerQuestionPage = () => {
   const router = useRouter();
-  const [question, setQuestion] = useState('');
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -22,20 +24,20 @@ const ShortAnswerQuestionPage = () => {
   const handleClickOutside = (event: MouseEvent) => {
     if (!event.target) return;
     const targetElement = event.target as HTMLElement;
-    if (!targetElement.closest('.sidebar') && !targetElement.closest('.menu-button')) {
+    if (
+      !targetElement.closest(".sidebar") &&
+      !targetElement.closest(".menu-button")
+    ) {
       setSidebarOpen(false);
     }
   };
 
-  const [answer, setAnswer] = useState('');
-
   const handleSave = () => {
-    // Placeholder for saving logic
     console.log({
       question,
-      answer
+      answer,
     });
-    alert('Question saved!');
+    alert("Question saved!");
   };
 
   return (
@@ -152,7 +154,7 @@ const ShortAnswerQuestionPage = () => {
             <li>
               <Link href="/teachprofile" legacyBehavior>
                 <a className="flex items-center p-2 rounded hover:bg-gray-700 transition duration-150">
-                <svg
+                  <svg
                     className="w-5 h-5 mr-2"
                     fill="none"
                     stroke="currentColor"
@@ -173,7 +175,7 @@ const ShortAnswerQuestionPage = () => {
             <li>
               <Link href="/teachsettings" legacyBehavior>
                 <a className="flex items-center p-2 rounded hover:bg-gray-700 transition duration-150">
-                <svg
+                  <svg
                     className="w-5 h-5 mr-2"
                     fill="none"
                     stroke="currentColor"
@@ -222,7 +224,11 @@ const ShortAnswerQuestionPage = () => {
         <div className="flex items-center justify-between bg-white p-4 shadow-md">
           <h1 className="text-2xl font-bold">Add Short Answer Question</h1>
           <div className="flex items-center">
-            <img src="/ZabirHD.png" alt="User profile" className="w-10 h-10 rounded-full mr-4" />
+            <img
+              src="/ZabirHD.png"
+              alt="User profile"
+              className="w-10 h-10 rounded-full mr-4"
+            />
             <div>
               <div className="font-bold">SWE22070001</div>
               <div className="text-gray-600">Software Engineering</div>
@@ -231,7 +237,12 @@ const ShortAnswerQuestionPage = () => {
         </div>
 
         {/* Content area */}
-        <div className="flex-1 p-4 space-y-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="flex-1 p-4 space-y-4"
+        >
           <h2 className="text-xl font-bold">Question</h2>
           <textarea
             value={question}
@@ -248,13 +259,23 @@ const ShortAnswerQuestionPage = () => {
             rows={2}
             placeholder="Enter the answer here"
           />
-          <button
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={handleSave}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mr-2"
           >
             Save Question
-          </button>
-        </div>
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => router.push("preview-questions")}
+            className="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            Preview Questions
+          </motion.button>
+        </motion.div>
       </div>
     </div>
   );

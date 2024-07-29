@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import Link from 'next/link';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import Link from "next/link";
+import { motion } from "framer-motion";
 
 const MultipleChoiceQuestionPage = () => {
   const router = useRouter();
-  const [question, setQuestion] = useState('');
-  const [options, setOptions] = useState(['', '', '', '']);
+  const [question, setQuestion] = useState("");
+  const [options, setOptions] = useState(["", "", "", ""]);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [correctOption, setCorrectOption] = useState("");
 
   useEffect(() => {
     if (isSidebarOpen) {
@@ -23,12 +25,13 @@ const MultipleChoiceQuestionPage = () => {
   const handleClickOutside = (event: MouseEvent) => {
     if (!event.target) return;
     const targetElement = event.target as HTMLElement;
-    if (!targetElement.closest('.sidebar') && !targetElement.closest('.menu-button')) {
+    if (
+      !targetElement.closest(".sidebar") &&
+      !targetElement.closest(".menu-button")
+    ) {
       setSidebarOpen(false);
     }
   };
-  
-  const [correctOption, setCorrectOption] = useState('');
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...options];
@@ -37,16 +40,13 @@ const MultipleChoiceQuestionPage = () => {
   };
 
   const handleSave = () => {
-    // Placeholder for saving logic
     console.log({
       question,
       options,
-      correctOption
+      correctOption,
     });
-    alert('Question saved!');
-
+    alert("Question saved!");
   };
-
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -162,7 +162,7 @@ const MultipleChoiceQuestionPage = () => {
             <li>
               <Link href="/teachprofile" legacyBehavior>
                 <a className="flex items-center p-2 rounded hover:bg-gray-700 transition duration-150">
-                <svg
+                  <svg
                     className="w-5 h-5 mr-2"
                     fill="none"
                     stroke="currentColor"
@@ -183,7 +183,7 @@ const MultipleChoiceQuestionPage = () => {
             <li>
               <Link href="/teachsettings" legacyBehavior>
                 <a className="flex items-center p-2 rounded hover:bg-gray-700 transition duration-150">
-                <svg
+                  <svg
                     className="w-5 h-5 mr-2"
                     fill="none"
                     stroke="currentColor"
@@ -232,7 +232,11 @@ const MultipleChoiceQuestionPage = () => {
         <div className="flex items-center justify-between bg-white p-4 shadow-md">
           <h1 className="text-2xl font-bold">Add Multiple Choice Question</h1>
           <div className="flex items-center">
-            <img src="/ZabirHD.png" alt="User profile" className="w-10 h-10 rounded-full mr-4" />
+            <img
+              src="/ZabirHD.png"
+              alt="User profile"
+              className="w-10 h-10 rounded-full mr-4"
+            />
             <div>
               <div className="font-bold">SWE22070001</div>
               <div className="text-gray-600">Software Engineering</div>
@@ -241,7 +245,12 @@ const MultipleChoiceQuestionPage = () => {
         </div>
 
         {/* Content area */}
-        <div className="flex-1 p-4 space-y-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="flex-1 p-4 space-y-4"
+        >
           <h2 className="text-xl font-bold">Question</h2>
           <textarea
             value={question}
@@ -252,7 +261,13 @@ const MultipleChoiceQuestionPage = () => {
           />
           <h2 className="text-xl font-bold">Options</h2>
           {options.map((option, index) => (
-            <div key={index} className="flex items-center mb-2">
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center mb-2"
+            >
               <input
                 type="text"
                 value={option}
@@ -260,7 +275,7 @@ const MultipleChoiceQuestionPage = () => {
                 className="w-full p-2 border rounded"
                 placeholder={`Option ${index + 1}`}
               />
-            </div>
+            </motion.div>
           ))}
           <h2 className="text-xl font-bold">Correct Option</h2>
           <select
@@ -270,16 +285,28 @@ const MultipleChoiceQuestionPage = () => {
           >
             <option value="">Select the correct option</option>
             {options.map((option, index) => (
-              <option key={index} value={option}>{`Option ${index + 1}`}</option>
+              <option key={index} value={option}>{`Option ${
+                index + 1
+              }`}</option>
             ))}
           </select>
-          <button
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={handleSave}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mr-2"
           >
             Save Question
-          </button>
-        </div>
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => router.push("preview-questions")}
+            className="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            Preview Questions
+          </motion.button>
+        </motion.div>
       </div>
     </div>
   );
