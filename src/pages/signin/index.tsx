@@ -1,9 +1,16 @@
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router'
 import Link from 'next/link';
 import Head from 'next/head';
 import GradientCanvas from '@/gradient/GradientCanvas';
 
+import { createClient } from '../../../utils/supabase/component';
+
 const SignInPage = () => {
+
+  const router = useRouter()
+  const supabase = createClient()
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSmallScreen, setIsSmallScreen] = useState(false);
@@ -18,10 +25,17 @@ const SignInPage = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Handle sign-in logic here
-    console.log('Sign in with:', email, password);
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      console.error(error)
+    }
+    else
+    {
+    router.push('/studentdash')
+    }
   };
 
   return (
@@ -75,14 +89,12 @@ const SignInPage = () => {
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition duration-200"
                   />
                 </div>
-                <Link legacyBehavior href="studentdash">
                 <button
                   type="submit"
                   className="w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-200"
                 >
                   Sign In
                 </button>
-                </Link>
               </form>
               <div className="text-center mt-4">
                 <Link href="/reset" className="text-sm text-indigo-500 hover:text-indigo-400 transition duration-200">

@@ -30,6 +30,12 @@ const config: Config = {
           },
         },
       },
+      colors: {
+        blue: {
+          100: '#E6F0FD',
+          600: '#2563EB',
+        },
+      },
     },
   },
   plugins: [addVariablesForColors],

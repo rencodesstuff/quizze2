@@ -52,7 +52,7 @@ const teamMembers = [
   {
     name: "Syasya",
     role: "Head QA",
-    img: "/path/to/bob.jpg"
+    img: "/path/to/bob.jpg",
   },
 ];
 
@@ -63,7 +63,7 @@ const words = [
   { text: "and" },
   { text: "expand" },
   { text: "your" },
-  { text: "mind", className: "text-blue-500 dark:text-blue-500" },
+  { text: "mind", className: "text-blue-500" },
 ];
 
 export default function Home() {
@@ -73,7 +73,7 @@ export default function Home() {
   useEffect(() => {
     const handleScroll = () => {
       const sections = ["hero", "features", "team", "description", "testimonials"];
-      const currentSection = sections.find(section => {
+      const currentSection = sections.find((section) => {
         const element = document.getElementById(section);
         if (element) {
           const rect = element.getBoundingClientRect();
@@ -91,18 +91,16 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="fixed top-0 left-0 right-0 z-50 p-4 flex justify-between items-center bg-white dark:bg-gray-900 shadow-md">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Quizze
-        </h1>
+    <div className="min-h-screen flex flex-col bg-white text-black">
+      <header className="fixed top-0 left-0 right-0 z-50 p-4 flex justify-between items-center bg-white shadow-md">
+        <h1 className="text-2xl font-bold text-blue-600">Quizze</h1>
         <nav className="hidden md:block">
           <ul className="flex space-x-4">
             {["Features", "Team", "About", "Testimonials"].map((item) => (
               <li key={item}>
                 <a
                   href={`#${item.toLowerCase()}`}
-                  className={`text-gray-600 dark:text-gray-300 hover:text-blue-500 ${
+                  className={`hover:text-blue-500 ${
                     activeSection === item.toLowerCase() ? "text-blue-500 font-bold" : ""
                   }`}
                 >
@@ -113,7 +111,7 @@ export default function Home() {
           </ul>
         </nav>
         <button
-          className="md:hidden text-gray-600 dark:text-gray-300"
+          className="md:hidden text-blue-600"
           onClick={() => setIsMenuOpen(!isMenuOpen)}
         >
           {isMenuOpen ? "✕" : "☰"}
@@ -121,14 +119,14 @@ export default function Home() {
       </header>
 
       {isMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-white dark:bg-gray-900 pt-16">
+        <div className="fixed inset-0 z-40 bg-white pt-16">
           <nav className="p-4">
             <ul className="space-y-4">
               {["Features", "Team", "About", "Testimonials"].map((item) => (
                 <li key={item}>
                   <a
                     href={`#${item.toLowerCase()}`}
-                    className="block text-gray-600 dark:text-gray-300 hover:text-blue-500"
+                    className="block hover:text-blue-500"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     {item}
@@ -141,13 +139,12 @@ export default function Home() {
       )}
 
       <main className="flex-grow pt-16">
-        {/* Hero Section */}
         <section
           id="hero"
           className="relative flex items-center justify-center h-screen bg-cover bg-center"
           style={{ backgroundImage: "url(/hero-image.jpg)" }}
         >
-          <div className="absolute inset-0 bg-black opacity-50"></div>
+          <div className="absolute inset-0 bg-black opacity-70"></div>
           <div className="relative text-center text-white p-8">
             <h2 className="text-5xl font-extrabold mb-4">The Ultimate Quiz Experience</h2>
             <TypewriterEffect words={words} />
@@ -158,7 +155,7 @@ export default function Home() {
                 </a>
               </Link>
               <Link href="/signup" legacyBehavior>
-                <a className="inline-block px-6 py-3 bg-green-600 text-white rounded-md shadow-md hover:bg-green-700 transition">
+                <a className="inline-block px-6 py-3 bg-white text-blue-600 rounded-md shadow-md hover:bg-gray-100 transition">
                   Sign Up
                 </a>
               </Link>
@@ -166,23 +163,18 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Features Section */}
-        <section id="features" className="py-16 bg-gray-100 dark:bg-gray-800">
+        <section id="features" className="py-16 bg-blue-50">
           <div className="container mx-auto text-center px-4">
-            <h3 className="text-4xl font-bold text-gray-900 dark:text-white">
-              Why Choose Quizze?
-            </h3>
-            <p className="mt-6 text-xl text-gray-700 dark:text-gray-300">
+            <h3 className="text-4xl font-bold text-blue-600">Why Choose Quizze?</h3>
+            <p className="mt-6 text-xl text-gray-700">
               Quizze offers a variety of topics, challenging questions, and an
               interactive experience.
             </p>
             <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
               {["Diverse Topics", "Challenging Questions", "Interactive Experience"].map((feature, index) => (
-                <div key={index} className="p-8 bg-white dark:bg-gray-900 rounded-md shadow-md transform hover:scale-105 transition-transform duration-300">
-                  <h4 className="text-2xl font-semibold text-gray-900 dark:text-white">
-                    {feature}
-                  </h4>
-                  <p className="mt-4 text-lg text-gray-700 dark:text-gray-300">
+                <div key={index} className="p-8 bg-white rounded-md shadow-md transform hover:scale-105 transition-transform duration-300">
+                  <h4 className="text-2xl font-semibold text-blue-600">{feature}</h4>
+                  <p className="mt-4 text-lg text-gray-700">
                     {index === 0 && "Explore quizzes across various subjects."}
                     {index === 1 && "Test your knowledge with tough questions."}
                     {index === 2 && "Enjoy an engaging and interactive quiz experience."}
@@ -193,13 +185,10 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Team Section */}
-        <section id="team" className="py-12 bg-white dark:bg-gray-900">
+        <section id="team" className="py-12 bg-white">
           <div className="container mx-auto text-center px-4">
-            <h3 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Meet Our Team
-            </h3>
-            <p className="mt-4 text-lg text-gray-700 dark:text-gray-300">
+            <h3 className="text-3xl font-bold text-blue-600">Meet Our Team</h3>
+            <p className="mt-4 text-lg text-gray-700">
               Our team is dedicated to providing you with the best quiz
               experience.
             </p>
@@ -207,7 +196,7 @@ export default function Home() {
               {teamMembers.map((member, index) => (
                 <div
                   key={index}
-                  className="p-6 bg-gray-100 dark:bg-gray-800 rounded-md shadow-md hover:shadow-lg transition-shadow duration-300"
+                  className="p-6 bg-blue-50 rounded-md shadow-md hover:shadow-lg transition-shadow duration-300"
                 >
                   <Image
                     src={member.img}
@@ -216,10 +205,10 @@ export default function Home() {
                     height={160}
                     className="w-36 h-40 rounded mx-auto mb-4 object-cover"
                   />
-                  <h4 className="text-xl font-semibold text-gray-900 dark:text-white text-center">
+                  <h4 className="text-xl font-semibold text-center text-blue-600">
                     {member.name}
                   </h4>
-                  <p className="mt-2 text-gray-700 dark:text-gray-300 text-center">
+                  <p className="mt-2 text-gray-700 text-center">
                     {member.role}
                   </p>
                 </div>
@@ -228,25 +217,22 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Description */}
-        <section id="description" className="flex flex-wrap items-center justify-between p-12 bg-white dark:bg-gray-800">
+        <section id="description" className="flex flex-wrap items-center justify-between p-12 bg-blue-50">
           <div className="w-full lg:w-1/2 mb-8 lg:mb-0">
-            <h2 className="text-4xl font-bold text-gray-900 dark:text-white">
-              Interactive Quiz Platform
-            </h2>
-            <p className="mt-4 text-lg text-gray-700 dark:text-gray-300">
+            <h2 className="text-4xl font-bold text-blue-600">Interactive Quiz Platform</h2>
+            <p className="mt-4 text-lg text-gray-700">
               Engage, learn, and excel. At Quizze, we believe there is a better way to
-              meet our clients&apos; needs. We&apos;re a company that exists to help you
+              meet our clients' needs. We're a company that exists to help you
               achieve more than you ever thought possible.
             </p>
-            <p className="mt-4 text-gray-600 dark:text-gray-400">
+            <p className="mt-4 text-gray-600">
               Understanding all the unique touch-points of each client is
               essential to our business. We focus on building reliable
               connections, amazing results, and trusted experiences that are as
               useful as they are memorable.
             </p>
-            <p className="mt-4 mb-6 text-gray-600 dark:text-gray-400">
-              Let&apos;s do great things together. We can&apos;t wait to work with you.
+            <p className="mt-4 mb-6 text-gray-600">
+              Let's do great things together. We can't wait to work with you.
             </p>
             <Link href="/contact" legacyBehavior>
               <a className="inline-block px-6 py-3 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition">
@@ -265,13 +251,10 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Testimonial Section */}
-        <section id="testimonials" className="py-12 bg-white dark:bg-gray-900">
+        <section id="testimonials" className="py-12 bg-white">
           <div className="container mx-auto text-center px-4">
-            <h3 className="text-3xl font-bold text-gray-900 dark:text-white">
-              What Our Users Say
-            </h3>
-            <p className="mt-4 text-lg text-gray-700 dark:text-gray-300">
+            <h3 className="text-3xl font-bold text-blue-600">What Our Users Say</h3>
+            <p className="mt-4 text-lg text-gray-700">
               Hear from our satisfied users who love Quizze.
             </p>
             <div className="mt-8">
@@ -281,8 +264,8 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="p-4 bg-gray-100 dark:bg-gray-800 text-center">
-        <p className="text-gray-700 dark:text-gray-300">
+      <footer className="p-4 bg-blue-600 text-center">
+        <p className="text-white">
           &copy; 2024 Quizze. All rights reserved.
         </p>
       </footer>

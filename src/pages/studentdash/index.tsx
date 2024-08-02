@@ -1,363 +1,339 @@
+// pages/studentdash/index.tsx
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import { Line } from "react-chartjs-2";
+import Image from "next/image";
+import { useRouter } from "next/router";
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from "chart.js";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
+  HomeIcon,
+  ClipboardCheckIcon,
+  InboxIcon,
+  UserIcon,
+  CogIcon,
+  ArrowLeftIcon,
+  MenuIcon,
+  XIcon,
+} from "@heroicons/react/outline";
 
-// Registering components for the chart
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
-);
+import { QuizCard } from "@/ui/quiz-card";
+import { HoveredLink } from "@/ui/hovered-link";
+import WeeklyCalendar from "@/ui/weekly-calendar";
 
-const data = {
-  labels: ["January", "February", "March", "April", "May", "June"],
-  datasets: [
-    {
-      label: "Quiz Scores",
-      data: [65, 59, 80, 81, 56, 55],
-      fill: false,
-      backgroundColor: "rgb(75, 192, 192)",
-      borderColor: "rgba(75, 192, 192, 0.2)",
-    },
-  ],
-};
+import { createClient } from "../../../utils/supabase/server-props";
+import { createClient as createClientComp } from "../../../utils/supabase/component";
+import type { GetServerSidePropsContext } from "next";
 
-const options = {
-  responsive: true,
-  plugins: {
-    legend: {
-      position: "top" as const,
-    },
-    title: {
-      display: true,
-      text: "Monthly Quiz Performance",
-    },
+interface SidebarItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+}
+
+interface Quiz {
+  title: string;
+  description: string;
+  icon: string;
+  questions: number;
+  duration: string;
+  difficulty: string;
+  category: string;
+}
+
+interface UpcomingQuiz {
+  name: string;
+  date: string;
+}
+
+const quizzes: Quiz[] = [
+  {
+    title: "Web Development Basics",
+    description: "Test your knowledge of HTML, CSS, and JavaScript fundamentals",
+    icon: "/web-dev-icon.png",
+    questions: 20,
+    duration: "30 minutes",
+    difficulty: "Beginner",
+    category: "Web Development",
   },
-};
+  {
+    title: "Data Structures",
+    description: "Challenge yourself with questions on arrays, linked lists, trees, and more",
+    icon: "/data-structures-icon.png",
+    questions: 25,
+    duration: "45 minutes",
+    difficulty: "Intermediate",
+    category: "Computer Science",
+  },
+  {
+    title: "Machine Learning Concepts",
+    description: "Explore your understanding of ML algorithms and techniques",
+    icon: "/ml-icon.png",
+    questions: 30,
+    duration: "60 minutes",
+    difficulty: "Advanced",
+    category: "Artificial Intelligence",
+  },
+];
 
-const StudentDashboard = () => {
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
+const upcomingQuizzes: UpcomingQuiz[] = [
+  { name: "JavaScript Advanced", date: "July 15, 2024" },
+  { name: "Python for Data Science", date: "July 20, 2024" },
+  { name: "React Fundamentals", date: "July 25, 2024" },
+];
+
+const StudentDashboard: React.FC = () => {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeItem, setActiveItem] = useState("dashboard");
+  const [isMobile, setIsMobile] = useState(false);
+  const supabasecomp = createClientComp();
+  const router = useRouter();
 
   useEffect(() => {
-    if (isSidebarOpen) {
-      document.addEventListener("click", handleClickOutside, true);
-    } else {
-      document.removeEventListener("click", handleClickOutside, true);
-    }
-
-    return () => {
-      document.removeEventListener("click", handleClickOutside, true);
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setIsSidebarOpen(false);
+      }
     };
-  }, [isSidebarOpen]);
 
-  const handleClickOutside = (event: MouseEvent) => {
-    if (!event.target) return;
-    const targetElement = event.target as HTMLElement;
-    if (!targetElement.closest('.sidebar') && !targetElement.closest('.menu-button')) {
-      setSidebarOpen(false);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const handleLogout = async () => {
+    const { error } = await supabasecomp.auth.signOut();
+    if (error) {
+      console.log(error);
+    } else {
+      router.push("/signin");
     }
   };
 
+  const sidebarItems: SidebarItem[] = [
+    { name: "Dashboard", href: "/studentdash", icon: HomeIcon },
+    { name: "Student Quiz", href: "/stdquiz", icon: ClipboardCheckIcon },
+    { name: "Student Inbox", href: "/stdinbox", icon: InboxIcon },
+    { name: "Student Profile", href: "/studentprofile", icon: UserIcon },
+    { name: "Student Settings", href: "/stdsettings", icon: CogIcon },
+  ];
+
+  const SidebarItem: React.FC<{ item: SidebarItem; isActive: boolean; isOpen: boolean }> = ({ item, isActive, isOpen }) => (
+    <Link href={item.href} passHref>
+      <div
+        className={`flex items-center p-2 rounded-lg cursor-pointer ${
+          isActive
+            ? "bg-blue-100 text-blue-600"
+            : "hover:bg-gray-100 text-gray-700"
+        } transition-colors duration-200`}
+        onClick={() => {
+          setActiveItem(item.name.toLowerCase());
+          if (isMobile) setIsSidebarOpen(false);
+        }}
+      >
+        <item.icon className="w-6 h-6" />
+        <span className={`ml-3 ${isOpen ? 'block' : 'hidden'}`}>{item.name}</span>
+      </div>
+    </Link>
+  );
+
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="flex flex-col md:flex-row min-h-screen bg-gray-100">
+      {/* Mobile Menu Button */}
+      {isMobile && (
+        <button
+          className="fixed top-4 left-4 z-20 bg-white p-2 rounded-md shadow-md"
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        >
+          <MenuIcon className="w-6 h-6" />
+        </button>
+      )}
+
       {/* Sidebar */}
       <div
-        className={`sidebar fixed inset-y-0 left-0 transform ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:relative md:translate-x-0 transition duration-300 ease-in-out bg-gray-800 text-white w-64 z-30 shadow-lg`}
+        className={`${
+          isMobile
+            ? isSidebarOpen
+              ? "fixed inset-y-0 left-0 z-10 w-64"
+              : "hidden"
+            : "relative"
+        } md:block transition-all duration-300 ease-in-out`}
+        onMouseEnter={() => !isMobile && setIsSidebarOpen(true)}
+        onMouseLeave={() => !isMobile && setIsSidebarOpen(false)}
       >
-        <div className="p-6 text-2xl font-bold border-b border-gray-700 flex items-center">
-          <svg
-            className="w-8 h-8 mr-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-            />
-          </svg>
-          Quizze
+        <div
+          className={`h-full bg-white shadow-md transition-all duration-300 ease-in-out ${
+            isSidebarOpen || isMobile ? "w-64" : "w-16"
+          } flex flex-col justify-between`}
+        >
+          {isMobile && (
+            <button
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <XIcon className="w-6 h-6" />
+            </button>
+          )}
+          <div>
+            <div className="flex items-center justify-center h-16 mb-8">
+              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                Q
+              </div>
+            </div>
+            <nav className="flex flex-col space-y-2 px-2">
+              {sidebarItems.map((item) => (
+                <SidebarItem
+                  key={item.name}
+                  item={item}
+                  isActive={activeItem === item.name.toLowerCase()}
+                  isOpen={isSidebarOpen || isMobile}
+                />
+              ))}
+            </nav>
+          </div>
+          <div className="px-2 mb-4">
+            <button
+              onClick={handleLogout}
+              className="flex items-center w-full p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+            >
+              <ArrowLeftIcon className="w-6 h-6" />
+              <span className={`ml-3 ${isSidebarOpen || isMobile ? 'block' : 'hidden'}`}>Logout</span>
+            </button>
+          </div>
         </div>
-        <nav className="flex-1 p-4 space-y-2">
-          <ul className="space-y-2">
-            <li>
-              <Link href="/studentdash" legacyBehavior>
-                <a className="flex items-center p-2 rounded hover:bg-gray-700 transition duration-150">
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 12h18M3 6h18M3 18h18"
-                    />
-                  </svg>
-                  Home
-                </a>
-              </Link>
-            </li>
-            <li>
-              <Link href="/stdquiz" legacyBehavior>
-                <a className="flex items-center p-2 rounded hover:bg-gray-700 transition duration-150">
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 12h14M12 5v14m-7-7h14M5 19h14M5 5h14"
-                    />
-                  </svg>
-                  My Quiz
-                </a>
-              </Link>
-            </li>
-
-            <li>
-              <Link href="/studentprofile" legacyBehavior>
-                <a className="flex items-center p-2 rounded hover:bg-gray-700 transition duration-150">
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 14l9-5-9-5-9 5 9 5z"
-                    />
-                  </svg>
-                  Profile
-                </a>
-              </Link>
-            </li>
-            <li>
-              <Link href="/stdinbox" legacyBehavior>
-                <a className="flex items-center p-2 rounded hover:bg-gray-700 transition duration-150">
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    />
-                  </svg>
-                  Inbox
-                </a>
-              </Link>
-            </li>
-            <li>
-              <Link href="/stdsettings" legacyBehavior>
-                <a className="flex items-center p-2 rounded hover:bg-gray-700 transition duration-150">
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M11 17a4 4 0 100-8 4 4 0 000 8zm7.92-5.62a9.05 9.05 0 00-.34-1.42l2.39-1.87a1 1 0 00.15-1.33l-2.54-3.1a1 1 0 00-1.31-.18l-2.8 1.1a8.93 8.93 0 00-1.58-.91L14 2.1a1 1 0 00-1-.1l-3.16 1.35a1 1 0 00-.57 1.28l1.1 2.8a9.05 9.05 0 00-.91 1.58L4.61 9.88a1 1 0 00-.18 1.31l2.54 3.1a1 1 0 001.33.18l2.39-1.87a9.05 9.05 0 001.42.34V18a1 1 0 001 1h3.09a1 1 0 001-1v-2.07a9.05 9.05 0 001.58-.91l2.8 1.1a1 1 0 001.31-.18l2.54-3.1a1 1 0 00-.18-1.31l-2.39-1.87z"
-                    />
-                  </svg>
-                  Settings
-                </a>
-              </Link>
-            </li>
-            <li className="mt-auto">
-              <Link href="/signin" legacyBehavior>
-                <a className="flex items-center p-2 rounded hover:bg-gray-700 transition duration-150">
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 12H3m12 0l-4-4m4 4l-4 4m13 2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2z"
-                    />
-                  </svg>
-                  Logout
-                </a>
-              </Link>
-            </li>
-          </ul>
-        </nav>
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col p-4">
+      <div className={`flex-1 flex flex-col p-4 overflow-hidden ${isMobile ? 'pt-16' : ''}`}>
         {/* Navbar */}
-        <div className="flex items-center justify-between bg-white p-4 shadow-md">
-          <button
-            className="md:hidden text-black menu-button"
-            onClick={() => setSidebarOpen(!isSidebarOpen)}
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16m-7 6h7"
-              />
-            </svg>
-          </button>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
+        <div className="flex items-center justify-between bg-white p-4 shadow-md rounded-lg mb-4">
+          <h1 className="text-2xl font-bold text-blue-600">Quiz Dashboard</h1>
           <div className="flex items-center">
-            <img
+            <Image
               src="/ZabirHD.png"
               alt="User profile"
-              className="w-10 h-10 rounded-full mr-4"
+              width={40}
+              height={40}
+              className="rounded-full mr-4"
             />
             <div>
-              <div className="font-bold">SWE22070001</div>
-              <div className="text-gray-600">Software Engineering</div>
+              <div className="font-bold">Syed Zabir</div>
+              <div className="text-gray-600">SWE22070167</div>
             </div>
           </div>
         </div>
 
         {/* Content area */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-          <div className="md:col-span-3 flex justify-between items-center">
-            <h2 className="text-2xl font-bold">Welcome to your Dashboard!</h2>
-            <Link href="/joinquiz" legacyBehavior>
-              <button className="py-2 px-4 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition">
-                Join Quiz
-              </button>
-            </Link>
-          </div>
-          {/* Chart and Calendar */}
-          <div className="md:col-span-2 bg-white p-4 shadow rounded-lg">
-            <Line data={data} options={options} />
-          </div>
-          <div className="bg-white p-4 shadow rounded-lg">
-            <FullCalendar
-              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-              initialView="dayGridMonth"
-              editable
-              selectable
-              events={[
-                { title: "Math Quiz", date: "2024-07-10" },
-                { title: "Chemistry Quiz", date: "2024-07-15" },
-                { title: "Physics Quiz", date: "2024-07-20" },
-              ]}
-            />
+        <div className="bg-white p-6 rounded-lg shadow-md overflow-auto">
+          {/* Welcome Message and Calendar */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+            <div className="mb-4 md:mb-0">
+              <h2 className="text-2xl font-semibold mb-2">
+                Welcome back, John!
+              </h2>
+              <p className="text-gray-600">
+                Ready to challenge yourself with some quizzes today?
+              </p>
+            </div>
+            <WeeklyCalendar />
           </div>
 
-          {/* Tables */}
-          <div className="md:col-span-2 bg-white shadow rounded-lg p-4">
-            <h2 className="font-semibold text-lg">Upcoming Quizzes</h2>
-            <table className="min-w-full mt-2">
+          {/* Quiz Categories */}
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">Quiz Categories</h2>
+            <div className="flex flex-wrap gap-4">
+              <HoveredLink href="#">All</HoveredLink>
+              <HoveredLink href="#">Web Development</HoveredLink>
+              <HoveredLink href="#">Computer Science</HoveredLink>
+              <HoveredLink href="#">Data Science</HoveredLink>
+              <HoveredLink href="#">Artificial Intelligence</HoveredLink>
+            </div>
+          </div>
+
+          {/* Available Quizzes */}
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">Available Quizzes</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {quizzes.map((quiz, index) => (
+                <QuizCard key={index} quiz={quiz} />
+              ))}
+            </div>
+          </div>
+
+          {/* Combined Upcoming Quizzes and Recent Quiz Results */}
+          <div className="bg-white p-4 rounded-lg shadow overflow-x-auto">
+            <h2 className="text-xl font-semibold mb-4">Upcoming Quizzes and Recent Results</h2>
+            <table className="min-w-full">
               <thead>
                 <tr>
-                  <th className="text-left p-2">Name</th>
-                  <th className="text-left p-2">Date</th>
+                  <th className="text-left">Quiz Name</th>
+                  <th className="text-left">Date</th>
+                  <th className="text-left">Score</th>
                 </tr>
               </thead>
               <tbody>
+                {upcomingQuizzes.map((quiz, index) => (
+                  <tr key={`upcoming-${index}`}>
+                    <td>{quiz.name}</td>
+                    <td>{quiz.date}</td>
+                    <td>Upcoming</td>
+                  </tr>
+                ))}
                 <tr>
-                  <td className="p-2">Math Quiz</td>
-                  <td className="p-2">Sept 10</td>
+                  <td>JavaScript Basics</td>
+                  <td>June 28, 2024</td>
+                  <td>85%</td>
                 </tr>
                 <tr>
-                  <td className="p-2">Chemistry Quiz</td>
-                  <td className="p-2">Sept 15</td>
+                  <td>Python Fundamentals</td>
+                  <td>June 25, 2024</td>
+                  <td>92%</td>
                 </tr>
                 <tr>
-                  <td className="p-2">Physics Quiz</td>
-                  <td className="p-2">Sept 20</td>
+                  <td>HTML and CSS</td>
+                  <td>June 20, 2024</td>
+                  <td>78%</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div className="md:col-span-1 bg-white shadow rounded-lg p-4">
-            <h2 className="font-semibold text-lg">Recent Quizzes</h2>
-            <table className="min-w-full mt-2">
-              <thead>
-                <tr>
-                  <th className="text-left p-2">Name</th>
-                  <th className="text-left p-2">Score</th>
-                  <th className="text-left p-2">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="p-2">History Quiz</td>
-                  <td className="p-2">85%</td>
-                  <td className="p-2">Aug 25</td>
-                </tr>
-                <tr>
-                  <td className="p-2">Literature Quiz</td>
-                  <td className="p-2">78%</td>
-                  <td className="p-2">Aug 20</td>
-                </tr>
-                <tr>
-                  <td className="p-2">Geography Quiz</td>
-                  <td className="p-2">90%</td>
-                  <td className="p-2">Aug 15</td>
-                </tr>
-              </tbody>
-            </table>
+
+          {/* Study Streak */}
+          <div className="mt-8 bg-white p-4 rounded-lg shadow">
+            <h2 className="text-xl font-semibold mb-4">Your Study Streak</h2>
+            <div className="flex items-center">
+              <div className="text-3xl font-bold text-blue-600 mr-4">7</div>
+              <div>
+                <p className="font-semibold">Days in a row</p>
+                <p className="text-gray-600">Keep it up!</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 };
+
+export async function getServerSideProps(context: GetServerSidePropsContext) {
+  const supabase = createClient(context);
+
+  const { data, error } = await supabase.auth.getUser();
+
+  if (error || !data) {
+    return {
+      redirect: {
+        destination: "/signin",
+        permanent: false,
+      },
+    };
+  }
+
+  return {
+    props: {
+      user: data.user,
+    },
+  };
+}
 
 export default StudentDashboard;

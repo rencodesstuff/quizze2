@@ -3,6 +3,10 @@ import Head from "next/head";
 import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
+import { useRouter } from 'next/router'
+import { useState } from 'react'
+
+import { createClient } from "../../../utils/supabase/component";
 
 const settings = {
   dots: true,
@@ -16,7 +20,27 @@ const settings = {
 };
 
 const SignUpPage = () => {
+
+  const router = useRouter()
+  const supabase = createClient()
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // Handle register logic here
+    const { error } = await supabase.auth.signUp({ email, password })
+    if (error) {
+      console.error(error)
+    }
+    else
+    {
+    router.push('/signin')
+    }
+  };
   const slides = [
+
     {
       image: "/notes.jpg",
       alt: "Explore, Learn, and Excel",
@@ -77,7 +101,7 @@ const SignUpPage = () => {
                 <label htmlFor="password" className="text-sm font-medium text-gray-700">Password</label>
                 <input type="password" id="password" autoComplete="new-password" required className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
               </div>
-              <button type="submit" className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+              <button type="submit" onClick={handleSubmit} className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                 Create Account
               </button>
             </form>
