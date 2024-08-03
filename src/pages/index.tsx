@@ -222,7 +222,7 @@ export default function Home() {
             <h2 className="text-4xl font-bold text-blue-600">Interactive Quiz Platform</h2>
             <p className="mt-4 text-lg text-gray-700">
               Engage, learn, and excel. At Quizze, we believe there is a better way to
-              meet our clients' needs. We're a company that exists to help you
+              meet our clients&apos; needs. We&apos;re a company that exists to help you
               achieve more than you ever thought possible.
             </p>
             <p className="mt-4 text-gray-600">
@@ -232,7 +232,7 @@ export default function Home() {
               useful as they are memorable.
             </p>
             <p className="mt-4 mb-6 text-gray-600">
-              Let's do great things together. We can't wait to work with you.
+              Let&apos;s do great things together. We can&apos;t wait to work with you.
             </p>
             <Link href="/contact" legacyBehavior>
               <a className="inline-block px-6 py-3 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition">
