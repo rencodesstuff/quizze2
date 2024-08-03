@@ -1,16 +1,21 @@
-// components/ui/hovered-link.tsx
-import React from 'react';
-import Link from 'next/link';
+// @/ui/hovered-link.tsx
+import React from "react";
+import Link from "next/link";
 
 interface HoveredLinkProps {
   href: string;
   children: React.ReactNode;
+  className?: string;
+  onClick?: () => void;
 }
 
-export const HoveredLink: React.FC<HoveredLinkProps> = ({ href, children }) => {
+export const HoveredLink: React.FC<HoveredLinkProps> = ({ href, children, className = "", onClick }) => {
   return (
-    <Link href={href}>
-      <span className="text-gray-600 hover:text-blue-600 transition-colors duration-300 cursor-pointer">
+    <Link href={href} passHref>
+      <span 
+        className={`cursor-pointer hover:text-blue-600 transition-colors duration-200 ${className}`}
+        onClick={onClick}
+      >
         {children}
       </span>
     </Link>
