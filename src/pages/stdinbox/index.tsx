@@ -1,9 +1,9 @@
-// pages/stdinbox/index.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Card, Title, Text, TabGroup, TabList, Tab, TabPanels, TabPanel } from "@tremor/react";
 import { SearchIcon, MailIcon, TrashIcon, StarIcon } from "@heroicons/react/outline";
 import StudentLayout from "@/comps/student-layout";
+import { createClient } from "../../../utils/supabase/component";
 
 type Message = {
   id: number;
@@ -44,14 +44,63 @@ const messages: Message[] = [
 const StudentInbox: React.FC = () => {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [studentName, setStudentName] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const supabase = createClient();
+
+  useEffect(() => {
+    const fetchStudentInfo = async () => {
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError) {
+          throw new Error(`Error fetching user: ${userError.message}`);
+        }
+
+        if (user) {
+          const { data, error } = await supabase
+            .from('students')
+            .select('name, student_id')
+            .eq('id', user.id)
+            .single();
+
+          if (error) {
+            throw new Error(`Error fetching student info: ${error.message}`);
+          }
+
+          if (data) {
+            setStudentName(data.name);
+            setStudentId(data.student_id);
+          } else {
+            throw new Error('No student data found');
+          }
+        } else {
+          throw new Error('No authenticated user found');
+        }
+      } catch (err) {
+        console.error('Error in fetchStudentInfo:', err);
+        // You might want to handle this error more gracefully in a production app
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStudentInfo();
+  }, []);
 
   const filteredMessages = messages.filter(message =>
     message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
     message.sender.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
   return (
-    <StudentLayout>
+    <StudentLayout studentName={studentName} studentId={studentId}>
       <div className="p-6">
         <Title>Student Inbox</Title>
         <Text>Manage your messages and notifications</Text>
