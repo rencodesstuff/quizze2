@@ -7,13 +7,13 @@ import GradientCanvas from '@/gradient/GradientCanvas';
 import { createClient } from '../../../utils/supabase/component';
 
 const SignInPage = () => {
-
   const router = useRouter()
   const supabase = createClient()
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSmallScreen, setIsSmallScreen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -27,14 +27,42 @@ const SignInPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle sign-in logic here
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      console.error(error)
-    }
-    else
-    {
-    router.push('/studentdash')
+    setIsLoading(true);
+
+    try {
+      // Attempt to sign in
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (error) throw error;
+
+      if (data.user) {
+        // Fetch the user's role
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+
+        if (roleError) throw roleError;
+
+        // Redirect based on role
+        if (roleData.role === 'student') {
+          router.push('/studentdash');
+        } else if (roleData.role === 'teacher') {
+          router.push('/teachdash');
+        } else {
+          // Handle other roles or unexpected cases
+          console.error('Unknown user role');
+          // You might want to sign out the user here
+          await supabase.auth.signOut();
+          alert('Unknown user role. Please contact support.');
+        }
+      }
+    } catch (error) {
+      console.error('Error during sign in:', error);
+      alert('An error occurred during sign in. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -91,9 +119,10 @@ const SignInPage = () => {
                 </div>
                 <button
                   type="submit"
+                  disabled={isLoading}
                   className="w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-200"
                 >
-                  Sign In
+                  {isLoading ? 'Signing In...' : 'Sign In'}
                 </button>
               </form>
               <div className="text-center mt-4">

@@ -1,11 +1,10 @@
+import { useState } from 'react';
+import { useRouter } from 'next/router';
 import Link from "next/link";
 import Head from "next/head";
 import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
-import { useRouter } from 'next/router'
-import { useState } from 'react'
-
 import { createClient } from "../../../utils/supabase/component";
 
 const settings = {
@@ -20,27 +19,103 @@ const settings = {
 };
 
 const SignUpPage = () => {
+  const router = useRouter();
+  const supabase = createClient();
 
-  const router = useRouter()
-  const supabase = createClient()
-
+  const [name, setName] = useState('');
+  const [studentId, setStudentId] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle register logic here
-    const { error } = await supabase.auth.signUp({ email, password })
-    if (error) {
-      console.error(error)
+    setError(null);
+
+    // Basic form validation
+    if (!name || !studentId || !email || !password) {
+      setError("All fields are required");
+      return;
     }
-    else
-    {
-    router.push('/signin')
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Invalid email format");
+      return;
+    }
+
+    // Password strength check (example: at least 8 characters)
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long");
+      return;
+    }
+
+    try {
+      // Sign up the user
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            student_id: studentId,
+          }
+        }
+      });
+
+      if (signUpError) throw signUpError;
+
+      if (authData.user) {
+        console.log("User created in auth:", authData.user);
+
+        // Insert user role
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .insert({
+            id: authData.user.id,
+            role: 'student',
+          });
+
+        if (roleError) {
+          console.error("Error inserting user role:", roleError);
+          throw roleError;
+        }
+
+        console.log("User role inserted:", roleData);
+
+        // Insert student data
+        const { data: studentData, error: studentError } = await supabase
+          .from('students')
+          .insert({
+            id: authData.user.id,
+            name,
+            student_id: studentId,
+            email,
+          });
+
+        if (studentError) {
+          console.error("Error inserting student data:", studentError);
+          throw studentError;
+        }
+
+        console.log("Student data inserted:", studentData);
+
+        // Registration successful
+        alert("Registration successful! Please check your email to confirm your account.");
+        router.push('/signin');
+      }
+    } catch (error) {
+      console.error("Registration error:", error);
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError("An error occurred during registration");
+      }
     }
   };
-  const slides = [
 
+  const slides = [
     {
       image: "/notes.jpg",
       alt: "Explore, Learn, and Excel",
@@ -61,7 +136,7 @@ const SignUpPage = () => {
   return (
     <>
       <Head>
-        <title>Sign Up | Quizze</title>
+        <title>Student Sign Up | Quizze</title>
       </Head>
       <div className="flex flex-wrap min-h-screen items-center justify-center">
         {/* Slider and Information Side */}
@@ -83,30 +158,64 @@ const SignUpPage = () => {
         {/* Form Side */}
         <div className="w-full md:w-1/2 flex items-center justify-center p-10 bg-white">
           <div className="max-w-md w-full">
-            <h1 className="text-3xl font-bold text-center mb-6">Create an account now</h1>
-            <form className="space-y-6">
+            <h1 className="text-3xl font-bold text-center mb-6">Create a Student Account</h1>
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label htmlFor="name" className="text-sm font-medium text-gray-700">Name</label>
-                <input type="text" id="name" autoComplete="name" required className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                <input
+                  type="text"
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
               <div>
                 <label htmlFor="studentID" className="text-sm font-medium text-gray-700">Student ID</label>
-                <input type="text" id="studentID" autoComplete="new-studentID" required className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                <input
+                  type="text"
+                  id="studentID"
+                  value={studentId}
+                  onChange={(e) => setStudentId(e.target.value)}
+                  required
+                  className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
               <div>
                 <label htmlFor="email" className="text-sm font-medium text-gray-700">Email</label>
-                <input type="email" id="email" autoComplete="email" required className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                <input
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
               <div>
                 <label htmlFor="password" className="text-sm font-medium text-gray-700">Password</label>
-                <input type="password" id="password" autoComplete="new-password" required className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                <input
+                  type="password"
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
-              <button type="submit" onClick={handleSubmit} className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+              {error && (
+                <div className="text-red-500 text-sm">{error}</div>
+              )}
+              <button
+                type="submit"
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
                 Create Account
               </button>
             </form>
             <p className="text-center mt-4 text-sm text-gray-600">
-              Already have an account? <Link legacyBehavior href="/signin">
+              Already have an account? <Link href="/signin" legacyBehavior>
                 <a className="font-medium text-blue-600 hover:text-blue-500">Login</a>
               </Link>
             </p>

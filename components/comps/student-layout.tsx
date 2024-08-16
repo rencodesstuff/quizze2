@@ -1,4 +1,3 @@
-// components/StudentLayout.tsx
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Sidebar from "./sidebar";
@@ -8,15 +7,17 @@ import { createClient as createClientComp } from "../../utils/supabase/component
 
 interface StudentLayoutProps {
   children: React.ReactNode;
+  studentName: string;
+  studentId: string;
 }
 
-const StudentLayout: React.FC<StudentLayoutProps> = ({ children }) => {
+const StudentLayout: React.FC<StudentLayoutProps> = ({ children, studentName, studentId }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [profilePictureUrl, setProfilePictureUrl] = useState("/ZabirHD.png"); // Default image
   const supabasecomp = createClientComp();
   const router = useRouter();
 
-  // Determine active item based on the current route
   const activeItem = router.pathname.split('/')[1] || 'studentdash';
 
   useEffect(() => {
@@ -30,6 +31,24 @@ const StudentLayout: React.FC<StudentLayoutProps> = ({ children }) => {
 
     handleResize();
     window.addEventListener("resize", handleResize);
+
+    // Fetch user profile picture
+    const fetchProfilePicture = async () => {
+      const { data: { user } } = await supabasecomp.auth.getUser();
+      if (user) {
+        const { data, error } = await supabasecomp
+          .from('students')
+          .select('profile_picture_url')
+          .eq('id', user.id)
+          .single();
+
+        if (data && data.profile_picture_url) {
+          setProfilePictureUrl(data.profile_picture_url);
+        }
+      }
+    };
+
+    fetchProfilePicture();
 
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -78,7 +97,11 @@ const StudentLayout: React.FC<StudentLayoutProps> = ({ children }) => {
       </div>
 
       <div className={`flex-1 flex flex-col p-4 overflow-hidden ${isMobile ? 'pt-16' : ''}`}>
-        <Navbar />
+        <Navbar 
+          studentName={studentName} 
+          studentId={studentId} 
+          profilePictureUrl={profilePictureUrl}
+        />
         {children}
       </div>
     </div>

@@ -1,4 +1,3 @@
-// components/TeacherLayout.tsx
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import TeacherSidebar from "./teachsidebar";
@@ -13,10 +12,13 @@ interface TeacherLayoutProps {
 const TeacherLayout: React.FC<TeacherLayoutProps> = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [teacherName, setTeacherName] = useState("");
+  const [teacherCourse, setTeacherCourse] = useState("");
+  const [profilePictureUrl, setProfilePictureUrl] = useState("/TeacherAvatar.png");
+  const [isLoading, setIsLoading] = useState(true);
   const supabasecomp = createClientComp();
   const router = useRouter();
 
-  // Determine active item based on the current route
   const activeItem = router.pathname.split('/')[1] || 'teachdash';
 
   useEffect(() => {
@@ -31,6 +33,54 @@ const TeacherLayout: React.FC<TeacherLayoutProps> = ({ children }) => {
     handleResize();
     window.addEventListener("resize", handleResize);
 
+    const fetchTeacherInfo = async () => {
+      setIsLoading(true);
+      try {
+        console.log("Fetching user data...");
+        const { data: { user }, error: userError } = await supabasecomp.auth.getUser();
+        
+        if (userError) {
+          console.error("Error fetching user:", userError);
+          return;
+        }
+
+        if (user) {
+          console.log("Authenticated user:", user);
+          console.log("Fetching teacher data for user ID:", user.id);
+          const { data, error } = await supabasecomp
+            .from('teachers')
+            .select('name, course, profile_picture_url')
+            .eq('id', user.id)
+            .single();
+
+          if (error) {
+            console.error('Error fetching teacher info:', error);
+            return;
+          }
+
+          console.log("Fetched teacher data:", data);
+
+          if (data) {
+            setTeacherName(data.name || "");
+            setTeacherCourse(data.course || "");
+            if (data.profile_picture_url) {
+              setProfilePictureUrl(data.profile_picture_url);
+            }
+          } else {
+            console.warn("No teacher data found for user:", user.id);
+          }
+        } else {
+          console.warn("No authenticated user found");
+        }
+      } catch (error) {
+        console.error("Unexpected error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTeacherInfo();
+
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
@@ -42,6 +92,8 @@ const TeacherLayout: React.FC<TeacherLayoutProps> = ({ children }) => {
       router.push("/signin");
     }
   };
+
+  console.log("Rendering TeacherLayout:", { teacherName, teacherCourse, isLoading });
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-100">
@@ -78,7 +130,12 @@ const TeacherLayout: React.FC<TeacherLayoutProps> = ({ children }) => {
       </div>
 
       <div className={`flex-1 flex flex-col p-4 overflow-hidden ${isMobile ? 'pt-16' : ''}`}>
-        <TeacherNavbar />
+        <TeacherNavbar 
+          teacherName={teacherName} 
+          teacherCourse={teacherCourse} 
+          profilePictureUrl={profilePictureUrl}
+          isLoading={isLoading}
+        />
         {children}
       </div>
     </div>

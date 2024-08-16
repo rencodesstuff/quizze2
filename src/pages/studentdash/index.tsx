@@ -1,4 +1,3 @@
-// pages/studentdash/index.tsx
 import React, { useState } from "react";
 import StudentLayout from "@/comps/student-layout";
 import { QuizCard } from "@/ui/quiz-card";
@@ -21,6 +20,12 @@ interface Quiz {
 interface UpcomingQuiz {
   name: string;
   date: string;
+}
+
+interface StudentDashboardProps {
+  user: any;
+  studentName: string;
+  studentId: string;
 }
 
 const quizzes: Quiz[] = [
@@ -58,7 +63,8 @@ const upcomingQuizzes: UpcomingQuiz[] = [
   { name: "Python for Data Science", date: "July 20, 2024" },
   { name: "React Fundamentals", date: "July 25, 2024" },
 ];
-const StudentDashboard: React.FC = () => {
+
+const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, studentName, studentId }) => {
   const [selectedCategory, setSelectedCategory] = useState("All");
 
   const filteredQuizzes = selectedCategory === "All" 
@@ -66,13 +72,13 @@ const StudentDashboard: React.FC = () => {
     : quizzes.filter(quiz => quiz.category === selectedCategory);
 
   return (
-    <StudentLayout>
+    <StudentLayout studentName={studentName} studentId={studentId}>
       <div className="bg-white p-6 rounded-lg shadow-md overflow-auto">
         {/* Welcome Message and Calendar */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
           <div className="mb-4 md:mb-0">
             <h2 className="text-2xl font-semibold mb-2">
-              Welcome back, John!
+              Welcome back, {studentName}!
             </h2>
             <p className="text-gray-600">
               Ready to challenge yourself with some quizzes today?
@@ -180,9 +186,9 @@ const StudentDashboard: React.FC = () => {
 export async function getServerSideProps(context: GetServerSidePropsContext) {
   const supabase = createClient(context);
 
-  const { data, error } = await supabase.auth.getUser();
+  const { data: { user }, error } = await supabase.auth.getUser();
 
-  if (error || !data) {
+  if (error || !user) {
     return {
       redirect: {
         destination: "/signin",
@@ -191,10 +197,25 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     };
   }
 
+  // Fetch user details from the students table
+  const { data: studentData, error: studentError } = await supabase
+    .from('students')
+    .select('name, student_id')
+    .eq('id', user.id)
+    .single();
+
+  if (studentError) {
+    console.error('Error fetching student data:', studentError);
+    // Handle error as appropriate for your application
+  }
+
   return {
     props: {
-      user: data.user,
+      user: user,
+      studentName: studentData?.name || 'Student',
+      studentId: studentData?.student_id || '',
     },
   };
 }
+
 export default StudentDashboard;
