@@ -1,9 +1,9 @@
-// pages/stdquiz/index.tsx
 import React, { useState, useEffect } from "react";
 import StudentLayout from "@/comps/student-layout";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Card, Title, Text, TabList, Tab, TabGroup, TabPanel, TabPanels } from "@tremor/react";
+import { createClient } from "../../../utils/supabase/component";
 
 interface Quiz {
   id: number;
@@ -74,8 +74,51 @@ const QuizCard: React.FC<{ quiz: Quiz; type: "joined" | "upcoming" | "recent" }>
 const MyQuizzes: React.FC = () => {
   const [quizCode, setQuizCode] = useState("");
   const [isMobile, setIsMobile] = useState(false);
+  const [studentName, setStudentName] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const supabase = createClient();
 
   useEffect(() => {
+    const fetchStudentInfo = async () => {
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError) {
+          throw new Error(`Error fetching user: ${userError.message}`);
+        }
+
+        if (user) {
+          const { data, error } = await supabase
+            .from('students')
+            .select('name, student_id')
+            .eq('id', user.id)
+            .single();
+
+          if (error) {
+            throw new Error(`Error fetching student info: ${error.message}`);
+          }
+
+          if (data) {
+            setStudentName(data.name);
+            setStudentId(data.student_id);
+          } else {
+            throw new Error('No student data found');
+          }
+        } else {
+          throw new Error('No authenticated user found');
+        }
+      } catch (err) {
+        console.error('Error in fetchStudentInfo:', err);
+        // Handle error appropriately
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStudentInfo();
+
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
@@ -97,8 +140,12 @@ const MyQuizzes: React.FC = () => {
     console.log("QR Code scanned:", mockScannedCode);
   };
 
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
   return (
-    <StudentLayout>
+    <StudentLayout studentName={studentName} studentId={studentId}>
       <div className="p-6">
         <Title>My Quizzes</Title>
         <Text>Manage and view your quizzes</Text>
