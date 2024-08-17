@@ -1,8 +1,12 @@
 import { useState, useEffect } from "react";
 import StudentLayout from "@/comps/student-layout";
+import { createClient } from "../../../utils/supabase/component";
 
 const StudentSettings = () => {
   const [activeTab, setActiveTab] = useState('general');
+  const [studentName, setStudentName] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [loading, setLoading] = useState(true);
 
   // Mock API data for user settings
   const [settings, setSettings] = useState({
@@ -12,6 +16,48 @@ const StudentSettings = () => {
     privacyMode: 'Public',
     twoFactorAuth: 'Disabled'
   });
+
+  const supabase = createClient();
+
+  useEffect(() => {
+    const fetchStudentInfo = async () => {
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError) {
+          throw new Error(`Error fetching user: ${userError.message}`);
+        }
+
+        if (user) {
+          const { data, error } = await supabase
+            .from('students')
+            .select('name, student_id')
+            .eq('id', user.id)
+            .single();
+
+          if (error) {
+            throw new Error(`Error fetching student info: ${error.message}`);
+          }
+
+          if (data) {
+            setStudentName(data.name);
+            setStudentId(data.student_id);
+          } else {
+            throw new Error('No student data found');
+          }
+        } else {
+          throw new Error('No authenticated user found');
+        }
+      } catch (err) {
+        console.error('Error in fetchStudentInfo:', err);
+        // Handle error appropriately
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStudentInfo();
+  }, []);
 
   const tabs = [
     { id: 'general', label: 'General' },
@@ -24,8 +70,12 @@ const StudentSettings = () => {
     console.log('Settings saved:', settings);
   };
 
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
   return (
-    <StudentLayout>
+    <StudentLayout studentName={studentName} studentId={studentId}>
       {/* Content area */}
       <div className="flex-1 p-4 space-y-4">
         <div className="bg-white shadow rounded-lg overflow-hidden">
