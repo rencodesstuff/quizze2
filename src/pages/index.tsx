@@ -52,7 +52,7 @@ const teamMembers = [
   {
     name: "Syasya",
     role: "Head QA",
-    img: "/path/to/bob.jpg",
+    img: "/Syasya.jpg",
   },
 ];
 

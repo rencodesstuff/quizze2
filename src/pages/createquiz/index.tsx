@@ -1,8 +1,10 @@
 import React, { useState } from "react";
+import { useRouter } from "next/router";
 import TeacherLayout from "@/comps/teacher-layout";
-import Link from "next/link";
+import { createClient } from "../../../utils/supabase/component";
 
 const CreateQuiz: React.FC = () => {
+  const router = useRouter();
   const [quizTitle, setQuizTitle] = useState("");
   const [duration, setDuration] = useState({ hours: "", minutes: "" });
   const [releaseDate, setReleaseDate] = useState("");
@@ -10,24 +12,60 @@ const CreateQuiz: React.FC = () => {
   const [maxParticipants, setMaxParticipants] = useState("");
   const [strictMode, setStrictMode] = useState(false);
   const [randomizeArrangement, setRandomizeArrangement] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const supabase = createClient();
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission
-    console.log({
-      quizTitle,
-      duration,
-      releaseDate,
-      releaseTime,
-      maxParticipants,
-      strictMode,
-      randomizeArrangement,
-    });
+    setIsSubmitting(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error("No authenticated user found");
+      }
+
+      const totalMinutes = 
+        (parseInt(duration.hours) || 0) * 60 + 
+        (parseInt(duration.minutes) || 0);
+
+      const releaseDateTime = releaseDate && releaseTime 
+        ? new Date(`${releaseDate}T${releaseTime}`).toISOString()
+        : null;
+
+      const { data, error } = await supabase
+        .from('quizzes')
+        .insert([
+          {
+            title: quizTitle,
+            duration_minutes: totalMinutes > 0 ? totalMinutes : null,
+            release_date: releaseDateTime,
+            max_participants: maxParticipants ? parseInt(maxParticipants) : null,
+            strict_mode: strictMode,
+            randomize_arrangement: randomizeArrangement,
+            teacher_id: user.id,
+          }
+        ])
+        .select();
+
+      if (error) throw error;
+
+      if (data && data[0]) {
+        router.push(`/addquestions/${data[0].id}`);
+      }
+    } catch (error) {
+      console.error('Error creating quiz:', error);
+      alert('Failed to create quiz. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <TeacherLayout>
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-lg shadow-md p-6 max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold text-blue-600 mb-6">Create New Quiz</h1>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
@@ -135,14 +173,13 @@ const CreateQuiz: React.FC = () => {
           </div>
 
           <div className="flex justify-end">
-            <Link href="/addquestions" passHref>
-              <button
-                type="submit"
-                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Create Quiz and Add Questions
-              </button>
-            </Link>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            >
+              {isSubmitting ? 'Creating...' : 'Create Quiz and Add Questions'}
+            </button>
           </div>
         </form>
       </div>

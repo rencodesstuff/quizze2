@@ -1,14 +1,66 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import TeacherLayout from "@/comps/teacher-layout";
 import Link from "next/link";
+import { createClient } from "../../../utils/supabase/component";
+
+interface Quiz {
+  id: string;
+  title: string;
+  duration_minutes: number | null;
+  release_date: string;
+  created_at: string;
+  code: string | null;
+}
 
 const MyQuizzes = () => {
-  const [quizzes, setQuizzes] = useState([
-    { id: 1, title: 'Introduction to React', subject: 'Web Development', questions: 15, dateCreated: '2024-07-15', status: 'Active' },
-    { id: 2, title: 'JavaScript Basics', subject: 'Programming', questions: 20, dateCreated: '2024-07-10', status: 'Draft' },
-    { id: 3, title: 'Data Structures', subject: 'Computer Science', questions: 25, dateCreated: '2024-07-05', status: 'Active' },
-    { id: 4, title: 'UI/UX Principles', subject: 'Design', questions: 18, dateCreated: '2024-06-30', status: 'Archived' },
-  ]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  useEffect(() => {
+    fetchQuizzes();
+  }, []);
+
+  const fetchQuizzes = async () => {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) throw new Error("No authenticated user found");
+
+      const { data, error } = await supabase
+        .from('quizzes')
+        .select('*')
+        .eq('teacher_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setQuizzes(data || []);
+    } catch (error) {
+      console.error('Error fetching quizzes:', error);
+      // You might want to show an error message to the user here
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (quizId: string) => {
+    try {
+      const { error } = await supabase
+        .from('quizzes')
+        .delete()
+        .eq('id', quizId);
+
+      if (error) throw error;
+
+      // Remove the deleted quiz from the state
+      setQuizzes(quizzes.filter(quiz => quiz.id !== quizId));
+    } catch (error) {
+      console.error('Error deleting quiz:', error);
+      // You might want to show an error message to the user here
+    }
+  };
 
   return (
     <TeacherLayout>
@@ -22,42 +74,46 @@ const MyQuizzes = () => {
           </Link>
         </div>
         
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="py-3 px-4 text-left">Title</th>
-                <th className="py-3 px-4 text-left">Subject</th>
-                <th className="py-3 px-4 text-left">Questions</th>
-                <th className="py-3 px-4 text-left">Date Created</th>
-                <th className="py-3 px-4 text-left">Status</th>
-                <th className="py-3 px-4 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {quizzes.map((quiz) => (
-                <tr key={quiz.id} className="border-b hover:bg-gray-50">
-                  <td className="py-4 px-4">{quiz.title}</td>
-                  <td className="py-4 px-4">{quiz.subject}</td>
-                  <td className="py-4 px-4">{quiz.questions}</td>
-                  <td className="py-4 px-4">{quiz.dateCreated}</td>
-                  <td className="py-4 px-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold
-                      ${quiz.status === 'Active' ? 'bg-green-200 text-green-800' :
-                        quiz.status === 'Draft' ? 'bg-yellow-200 text-yellow-800' :
-                        'bg-gray-200 text-gray-800'}`}>
-                      {quiz.status}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4">
-                    <button className="text-blue-600 hover:text-blue-800 mr-2">Edit</button>
-                    <button className="text-red-600 hover:text-red-800">Delete</button>
-                  </td>
+        {loading ? (
+          <p>Loading quizzes...</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="py-3 px-4 text-left">Title</th>
+                  <th className="py-3 px-4 text-left">Duration (minutes)</th>
+                  <th className="py-3 px-4 text-left">Release Date</th>
+                  <th className="py-3 px-4 text-left">Date Created</th>
+                  <th className="py-3 px-4 text-left">Code</th>
+                  <th className="py-3 px-4 text-left">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {quizzes.map((quiz) => (
+                  <tr key={quiz.id} className="border-b hover:bg-gray-50">
+                    <td className="py-4 px-4">{quiz.title}</td>
+                    <td className="py-4 px-4">{quiz.duration_minutes || 'N/A'}</td>
+                    <td className="py-4 px-4">{new Date(quiz.release_date).toLocaleString()}</td>
+                    <td className="py-4 px-4">{new Date(quiz.created_at).toLocaleString()}</td>
+                    <td className="py-4 px-4">{quiz.code || 'N/A'}</td>
+                    <td className="py-4 px-4">
+                      <Link href={`/editquiz/${quiz.id}`}>
+                        <button className="text-blue-600 hover:text-blue-800 mr-2">Edit</button>
+                      </Link>
+                      <button 
+                        className="text-red-600 hover:text-red-800"
+                        onClick={() => handleDelete(quiz.id)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </TeacherLayout>
   );

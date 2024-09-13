@@ -6,29 +6,17 @@ import { Card, Title, Text, TabList, Tab, TabGroup, TabPanel, TabPanels } from "
 import { createClient } from "../../../utils/supabase/component";
 
 interface Quiz {
-  id: number;
-  name: string;
-  date: string;
-  time?: string;
-  score?: string;
+  id: string;
+  title: string;
+  duration_minutes?: number | null;
+  release_date: string;
+  max_participants?: number | null;
+  strict_mode?: boolean | null;
+  randomize_arrangement?: boolean | null;
+  teacher_id?: string | null;
+  created_at?: string | null;
+  code?: string | null;
 }
-
-const joinedQuizzes: Quiz[] = [
-  { id: 1, name: "Advanced Mathematics", date: "2024-08-15", time: "10:00 AM" },
-  { id: 2, name: "World History", date: "2024-08-20", time: "2:00 PM" },
-  { id: 3, name: "Computer Science Fundamentals", date: "2024-08-25", time: "11:30 AM" },
-];
-
-const upcomingQuizzes: Quiz[] = [
-  { id: 4, name: "Physics Mechanics", date: "2024-09-05", time: "9:00 AM" },
-  { id: 5, name: "English Literature", date: "2024-09-10", time: "1:00 PM" },
-];
-
-const recentQuizzes: Quiz[] = [
-  { id: 6, name: "Biology", date: "2024-07-30", score: "85%" },
-  { id: 7, name: "Chemistry", date: "2024-08-02", score: "92%" },
-  { id: 8, name: "Geography", date: "2024-08-07", score: "78%" },
-];
 
 const QuizCard: React.FC<{ quiz: Quiz; type: "joined" | "upcoming" | "recent" }> = ({ quiz, type }) => {
   return (
@@ -38,30 +26,35 @@ const QuizCard: React.FC<{ quiz: Quiz; type: "joined" | "upcoming" | "recent" }>
       className="bg-white shadow-lg rounded-lg overflow-hidden"
     >
       <div className="p-5">
-        <h3 className="font-bold text-xl mb-2 text-blue-600">{quiz.name}</h3>
+        <h3 className="font-bold text-xl mb-2 text-blue-600">{quiz.title}</h3>
         <p className="text-gray-600">
-          <span className="font-semibold">Date:</span> {quiz.date}
+          <span className="font-semibold">Date:</span> {new Date(quiz.release_date).toLocaleDateString()}
         </p>
-        {quiz.time && (
+        <p className="text-gray-600">
+          <span className="font-semibold">Time:</span> {new Date(quiz.release_date).toLocaleTimeString()}
+        </p>
+        {quiz.duration_minutes && (
           <p className="text-gray-600">
-            <span className="font-semibold">Time:</span> {quiz.time}
-          </p>
-        )}
-        {quiz.score && (
-          <p className="text-gray-600">
-            <span className="font-semibold">Score:</span> {quiz.score}
+            <span className="font-semibold">Duration:</span> {quiz.duration_minutes} minutes
           </p>
         )}
         {type === "joined" && (
-          <Link href={`/stdquiz/${quiz.id}`} passHref>
+          <Link href={`/stdquiz/${quiz.id}`}>
             <button className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition duration-300">
-              Start Quiz
+              View Quiz
+            </button>
+          </Link>
+        )}
+        {type === "upcoming" && (
+          <Link href={`/stdquiz/${quiz.id}`}>
+            <button className="mt-4 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition duration-300">
+              Prepare for Quiz
             </button>
           </Link>
         )}
         {type === "recent" && (
-          <Link href={`/stdquiz/${quiz.id}`} passHref>
-            <button className="mt-4 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition duration-300">
+          <Link href={`/stdquiz/${quiz.id}`}>
+            <button className="mt-4 bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition duration-300">
               View Results
             </button>
           </Link>
@@ -77,41 +70,86 @@ const MyQuizzes: React.FC = () => {
   const [studentName, setStudentName] = useState("");
   const [studentId, setStudentId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [joinedQuizzes, setJoinedQuizzes] = useState<Quiz[]>([]);
+  const [upcomingQuizzes, setUpcomingQuizzes] = useState<Quiz[]>([]);
+  const [recentQuizzes, setRecentQuizzes] = useState<Quiz[]>([]);
 
   const supabase = createClient();
+
+  const fetchQuizzes = async (userId: string) => {
+    try {
+      const now = new Date();
+      const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  
+      // Fetch joined quizzes
+      const { data: joinedData, error: joinedError } = await supabase
+        .from('student_quizzes')
+        .select(`
+          quiz_id,
+          quizzes (*)
+        `)
+        .eq('student_id', userId);
+  
+      if (joinedError) throw joinedError;
+  
+      const allJoinedQuizzes = joinedData
+        .flatMap(item => {
+          const quizzes = Array.isArray(item.quizzes) ? item.quizzes : [item.quizzes];
+          return quizzes.filter((quiz): quiz is Quiz => 
+            !!quiz && 
+            typeof quiz.id === 'string' &&
+            typeof quiz.title === 'string' &&
+            typeof quiz.release_date === 'string'
+          );
+        });
+  
+      const joined = allJoinedQuizzes.filter(quiz => {
+        const quizDate = new Date(quiz.release_date);
+        return quizDate > oneWeekFromNow;
+      });
+
+      const upcoming = allJoinedQuizzes.filter(quiz => {
+        const quizDate = new Date(quiz.release_date);
+        return quizDate > now && quizDate <= oneWeekFromNow;
+      });
+
+      const recent = allJoinedQuizzes.filter(quiz => {
+        const quizDate = new Date(quiz.release_date);
+        return quizDate <= now;
+      });
+  
+      setJoinedQuizzes(joined);
+      setUpcomingQuizzes(upcoming);
+      setRecentQuizzes(recent);
+  
+    } catch (error) {
+      console.error('Error fetching quizzes:', error);
+    }
+  };
 
   useEffect(() => {
     const fetchStudentInfo = async () => {
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         
-        if (userError) {
-          throw new Error(`Error fetching user: ${userError.message}`);
-        }
+        if (userError) throw userError;
+        if (!user) throw new Error('No authenticated user found');
 
-        if (user) {
-          const { data, error } = await supabase
-            .from('students')
-            .select('name, student_id')
-            .eq('id', user.id)
-            .single();
+        const { data, error } = await supabase
+          .from('students')
+          .select('name, student_id')
+          .eq('id', user.id)
+          .single();
 
-          if (error) {
-            throw new Error(`Error fetching student info: ${error.message}`);
-          }
+        if (error) throw error;
+        if (!data) throw new Error('No student data found');
 
-          if (data) {
-            setStudentName(data.name);
-            setStudentId(data.student_id);
-          } else {
-            throw new Error('No student data found');
-          }
-        } else {
-          throw new Error('No authenticated user found');
-        }
+        setStudentName(data.name);
+        setStudentId(data.student_id);
+        await fetchQuizzes(user.id);
       } catch (err) {
         console.error('Error in fetchStudentInfo:', err);
-        // Handle error appropriately
+        // Handle error appropriately (e.g., show error message to user)
       } finally {
         setLoading(false);
       }
@@ -119,25 +157,39 @@ const MyQuizzes: React.FC = () => {
 
     fetchStudentInfo();
 
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const handleJoinQuiz = () => {
-    // Placeholder for join quiz functionality
-    console.log(`Joining quiz with code: ${quizCode}`);
-    // You would typically make an API call here
-  };
+  const handleJoinQuiz = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user found');
 
-  const handleScanQRCode = () => {
-    // Placeholder for QR code scanning
-    const mockScannedCode = "QUIZ123"; // This would be the result of actual QR scanning
-    setQuizCode(mockScannedCode);
-    console.log("QR Code scanned:", mockScannedCode);
+      const { data: quizData, error: quizError } = await supabase
+        .from('quizzes')
+        .select('*')
+        .eq('code', quizCode)
+        .single();
+
+      if (quizError) throw quizError;
+      if (!quizData) throw new Error('Invalid quiz code');
+
+      const { error: joinError } = await supabase
+        .from('student_quizzes')
+        .insert({ student_id: user.id, quiz_id: quizData.id });
+
+      if (joinError) throw joinError;
+
+      alert('Successfully joined the quiz!');
+      setQuizCode('');
+      await fetchQuizzes(user.id);
+    } catch (error) {
+      console.error('Error in handleJoinQuiz:', error);
+      alert(`Failed to join quiz: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   if (loading) {
@@ -185,7 +237,7 @@ const MyQuizzes: React.FC = () => {
 
         <Card className="mt-6">
           <Title>Join a New Quiz</Title>
-          <Text>Enter the quiz code or scan QR code to join a new quiz</Text>
+          <Text>Enter the quiz code to join a new quiz</Text>
           <div className="mt-4 flex flex-col md:flex-row">
             <input
               type="text"
@@ -201,16 +253,6 @@ const MyQuizzes: React.FC = () => {
               Join Quiz
             </button>
           </div>
-          {isMobile && (
-            <div className="mt-4">
-              <button
-                onClick={handleScanQRCode}
-                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition duration-300"
-              >
-                Scan QR Code
-              </button>
-            </div>
-          )}
         </Card>
       </div>
     </StudentLayout>

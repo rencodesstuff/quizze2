@@ -1,134 +1,225 @@
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart, Card, Title, Text, Subtitle } from '@tremor/react';
+import { Card, Title, Text, Button, ProgressBar } from '@tremor/react';
+import { createClient } from "../../../utils/supabase/component";
+import StudentLayout from '@/comps/student-layout';
 
 interface Question {
-  question: string;
-  answer: string;
-  correct: boolean;
+  id: string;
+  type: string;
+  text: string;
+  options: string[];
+  correct_answer: string;
 }
 
-interface QuizResult {
+interface Quiz {
   id: string;
-  name: string;
-  date: string;
-  score: string;
+  title: string;
+  duration_minutes: number;
+  release_date: string;
   questions: Question[];
 }
 
-const mockQuizResults: QuizResult[] = [
-    {
-      id: '6',
-      name: 'Biology',
-      date: '2024-07-30',
-      score: '85%',
-      questions: [
-        { question: 'What is the powerhouse of the cell?', answer: 'Mitochondria', correct: true },
-        { question: 'What is the largest organ in the human body?', answer: 'Skin', correct: true },
-        { question: 'What is the process by which plants make their own food?', answer: 'Photosynthesis', correct: true },
-        { question: 'What is the name of the pigment that gives plants their green color?', answer: 'Chloroplast', correct: false },
-        { question: 'What is the scientific name for the human species?', answer: 'Homo sapiens', correct: true },
-      ],
-    },
-    {
-      id: '7',
-      name: 'Chemistry',
-      date: '2024-08-02',
-      score: '92%',
-      questions: [
-        { question: 'What is the chemical symbol for water?', answer: 'H2O', correct: true },
-        { question: 'What type of bond involves the sharing of electron pairs between atoms?', answer: 'Covalent bond', correct: true },
-        { question: 'Which element has the highest electronegativity?', answer: 'Fluorine', correct: true },
-        { question: 'What is the process called where a solid turns directly into a gas?', answer: 'Sublimation', correct: true },
-        { question: 'What pH level is considered neutral?', answer: '7', correct: true },
-      ],
-    },
-    {
-      id: '8',
-      name: 'Geography',
-      date: '2024-08-07',
-      score: '78%',
-      questions: [
-        { question: 'What is the largest desert in the world?', answer: 'Antarctica', correct: true },
-        { question: 'Which river is the longest in the world?', answer: 'Amazon River', correct: false }, // Nile is the correct answer
-        { question: 'What is the imaginary line called that divides the earth into Northern and Southern Hemispheres?', answer: 'Equator', correct: true },
-        { question: 'Which country has the most natural lakes?', answer: 'Canada', correct: true },
-        { question: 'What is the capital city of Australia?', answer: 'Canberra', correct: true },
-      ],
-    },
-    // You can add more quizzes or other subjects as needed
-  ];
-  
-
-const QuizResult = () => {
+const TakeQuiz = () => {
   const router = useRouter();
   const { id } = router.query;
-  const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizAvailable, setQuizAvailable] = useState(false);
+  const [studentName, setStudentName] = useState(""); // Add this line
+  const [studentId, setStudentId] = useState(""); // Add this line
+  const supabase = createClient();
 
   useEffect(() => {
-    if (id) {
-      const result = mockQuizResults.find(quiz => quiz.id === id);
-      if (result) {
-        setQuizResult(result);
+    const fetchQuizAndStudentInfo = async () => {
+      if (typeof id !== 'string') return;
+
+      try {
+        // Fetch student info
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+        if (!user) throw new Error('No authenticated user found');
+
+        const { data: studentData, error: studentError } = await supabase
+          .from('students')
+          .select('name, student_id')
+          .eq('id', user.id)
+          .single();
+
+        if (studentError) throw studentError;
+        if (!studentData) throw new Error('No student data found');
+
+        setStudentName(studentData.name);
+        setStudentId(studentData.student_id);
+
+        // Fetch quiz data
+        const { data: quizData, error: quizError } = await supabase
+          .from('quizzes')
+          .select(`
+            id,
+            title,
+            duration_minutes,
+            release_date,
+            questions (
+              id,
+              type,
+              text,
+              options,
+              correct_answer
+            )
+          `)
+          .eq('id', id)
+          .single();
+
+        if (quizError) throw quizError;
+
+        setQuiz(quizData as Quiz);
+        
+        const now = new Date();
+        const quizDate = new Date(quizData.release_date);
+        
+        if (now >= quizDate) {
+          setQuizAvailable(true);
+          setTimeLeft(quizData.duration_minutes * 60);
+        } else {
+          setQuizAvailable(false);
+        }
+      } catch (error) {
+        console.error('Error fetching quiz or student info:', error);
       }
-    }
+    };
+
+    fetchQuizAndStudentInfo();
   }, [id]);
 
-  if (!quizResult) {
-    return <div>Loading...</div>;
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0 || quizSubmitted) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => (prev !== null ? prev - 1 : null));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [timeLeft, quizSubmitted]);
+
+  const handleAnswer = (questionId: string, answer: string) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: answer }));
+  };
+
+  const handleNextQuestion = () => {
+    if (quiz && currentQuestionIndex < quiz.questions.length - 1) {
+      setCurrentQuestionIndex((prev) => prev + 1);
+    }
+  };
+
+  const handlePreviousQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex((prev) => prev - 1);
+    }
+  };
+
+  const handleSubmitQuiz = async () => {
+    // Here you would typically send the answers to your backend
+    // For now, we'll just set the quiz as submitted
+    setQuizSubmitted(true);
+    
+    // Navigate to results page
+    router.push(`/quiz-result/${id}`);
+  };
+
+  if (!quiz) return <div>Loading...</div>;
+
+  if (!quizAvailable) {
+    return (
+      <StudentLayout studentName={studentName} studentId={studentId}>
+        <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-3xl mx-auto">
+            <Card>
+              <Title>{quiz.title}</Title>
+              <Text>This quiz is not yet available. Please check back at the scheduled time.</Text>
+              <Text>Scheduled start: {new Date(quiz.release_date).toLocaleString()}</Text>
+            </Card>
+          </div>
+        </div>
+      </StudentLayout>
+    );
   }
 
-  const chartdata = [
-    { name: 'Correct', 'Number of Questions': quizResult.questions.filter(q => q.correct).length },
-    { name: 'Incorrect', 'Number of Questions': quizResult.questions.filter(q => !q.correct).length },
-  ];
+  const currentQuestion = quiz.questions[currentQuestionIndex];
+  const progress = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
 
   return (
-    <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <Card>
-            <Title>{quizResult.name} Quiz Results</Title>
-            <Text>Date: {quizResult.date}</Text>
-            <Subtitle>Score: {quizResult.score}</Subtitle>
+    <StudentLayout studentName={studentName} studentId={studentId}>
+      <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-3xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Card>
+              <Title>{quiz.title}</Title>
+              <Text>Question {currentQuestionIndex + 1} of {quiz.questions.length}</Text>
+              <ProgressBar value={progress} className="mt-2" />
+              
+              {!quizSubmitted && timeLeft !== null && (
+                <Text className="mt-2">Time left: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</Text>
+              )}
 
-            <BarChart
-              className="mt-6"
-              data={chartdata}
-              index="name"
-              categories={['Number of Questions']}
-              colors={['green', 'red']}
-              yAxisWidth={48}
-            />
+              <div className="mt-6">
+                <Text className="font-semibold">{currentQuestion.text}</Text>
+                <div className="mt-4 space-y-2">
+                  {currentQuestion.options.map((option, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.1 }}
+                    >
+                      <label className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`question-${currentQuestion.id}`}
+                          value={option}
+                          checked={answers[currentQuestion.id] === option}
+                          onChange={() => handleAnswer(currentQuestion.id, option)}
+                          className="form-radio h-4 w-4 text-blue-600"
+                        />
+                        <span>{option}</span>
+                      </label>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
 
-            <div className="mt-8">
-              <h3 className="text-lg font-semibold mb-4">Question Breakdown</h3>
-              {quizResult.questions.map((q, index) => (
-                <motion.div
-                  key={index}
-                  className={`p-4 mb-4 rounded-lg ${q.correct ? 'bg-green-100' : 'bg-red-100'}`}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.1 }}
+              <div className="mt-8 flex justify-between">
+                <Button
+                  onClick={handlePreviousQuestion}
+                  disabled={currentQuestionIndex === 0}
+                  color="gray"
                 >
-                  <p className="font-medium">{q.question}</p>
-                  <p className="text-sm mt-1">Your answer: {q.answer}</p>
-                  <p className={`text-sm mt-1 ${q.correct ? 'text-green-600' : 'text-red-600'}`}>
-                    {q.correct ? 'Correct' : 'Incorrect'}
-                  </p>
-                </motion.div>
-              ))}
-            </div>
-          </Card>
-        </motion.div>
+                  Previous
+                </Button>
+                {currentQuestionIndex === quiz.questions.length - 1 ? (
+                  <Button onClick={handleSubmitQuiz} color="green">
+                    Submit Quiz
+                  </Button>
+                ) : (
+                  <Button onClick={handleNextQuestion} color="blue">
+                    Next
+                  </Button>
+                )}
+              </div>
+            </Card>
+          </motion.div>
+        </div>
       </div>
-    </div>
+    </StudentLayout>
   );
 };
 
-export default QuizResult;
+export default TakeQuiz;
