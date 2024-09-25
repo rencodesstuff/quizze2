@@ -4,6 +4,7 @@ import TeacherLayout from "@/comps/teacher-layout";
 import { createClient } from "../../../utils/supabase/component";
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import QuizDetailsModal from './QuizDetailsModal';
 
 interface Question {
   id: string;
@@ -15,6 +16,13 @@ interface Question {
   explanation: string;
 }
 
+interface QuizDetails {
+  code: string;
+  title: string;
+  releaseDate: string;
+  durationMinutes: number;
+}
+
 const PreviewQuizPage: React.FC = () => {
   const router = useRouter();
   const { quizId } = router.query;
@@ -22,6 +30,8 @@ const PreviewQuizPage: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [quizDetails, setQuizDetails] = useState<QuizDetails | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
   const supabase = createClient();
 
@@ -37,7 +47,7 @@ const PreviewQuizPage: React.FC = () => {
       // Fetch quiz details
       const { data: quizData, error: quizError } = await supabase
         .from('quizzes')
-        .select('title')
+        .select('title, release_date, duration_minutes')
         .eq('id', quizId)
         .single();
 
@@ -135,13 +145,18 @@ const PreviewQuizPage: React.FC = () => {
         .from('quizzes')
         .update({ code: quizCode })
         .eq('id', quizId)
-        .select();
+        .select('title, release_date, duration_minutes');
 
       if (error) throw error;
 
       if (data) {
-        alert(`Quiz code generated: ${quizCode}`);
-        router.push('/teachquiz');
+        setQuizDetails({
+          code: quizCode,
+          title: data[0].title,
+          releaseDate: data[0].release_date,
+          durationMinutes: data[0].duration_minutes
+        });
+        setShowModal(true);
       }
     } catch (error) {
       console.error('Error generating quiz code:', error);
@@ -149,6 +164,11 @@ const PreviewQuizPage: React.FC = () => {
     } finally {
       setIsGeneratingCode(false);
     }
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    router.push('/teachquiz');
   };
 
   if (isLoading) {
@@ -192,6 +212,13 @@ const PreviewQuizPage: React.FC = () => {
             {isGeneratingCode ? 'Generating Code...' : 'Finish'}
           </button>
         </div>
+        {quizDetails && (
+          <QuizDetailsModal
+            isOpen={showModal}
+            onClose={handleCloseModal}
+            quizDetails={quizDetails}
+          />
+        )}
       </div>
     </TeacherLayout>
   );

@@ -1,9 +1,7 @@
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Card, Title, Text, Button, ProgressBar } from '@tremor/react';
 import { createClient } from "../../../utils/supabase/component";
-import StudentLayout from '@/comps/student-layout';
 
 interface Question {
   id: string;
@@ -29,9 +27,10 @@ const TakeQuiz = () => {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [quizSubmitted, setQuizSubmitted] = useState(false);
-  const [quizAvailable, setQuizAvailable] = useState(false);
-  const [studentName, setStudentName] = useState(""); // Add this line
-  const [studentId, setStudentId] = useState(""); // Add this line
+  const [studentName, setStudentName] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -39,7 +38,6 @@ const TakeQuiz = () => {
       if (typeof id !== 'string') return;
 
       try {
-        // Fetch student info
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError) throw userError;
         if (!user) throw new Error('No authenticated user found');
@@ -56,7 +54,6 @@ const TakeQuiz = () => {
         setStudentName(studentData.name);
         setStudentId(studentData.student_id);
 
-        // Fetch quiz data
         const { data: quizData, error: quizError } = await supabase
           .from('quizzes')
           .select(`
@@ -78,18 +75,10 @@ const TakeQuiz = () => {
         if (quizError) throw quizError;
 
         setQuiz(quizData as Quiz);
-        
-        const now = new Date();
-        const quizDate = new Date(quizData.release_date);
-        
-        if (now >= quizDate) {
-          setQuizAvailable(true);
-          setTimeLeft(quizData.duration_minutes * 60);
-        } else {
-          setQuizAvailable(false);
-        }
+        setTimeLeft(quizData.duration_minutes * 60);
       } catch (error) {
         console.error('Error fetching quiz or student info:', error);
+        // Handle error (e.g., show error message to user)
       }
     };
 
@@ -100,7 +89,15 @@ const TakeQuiz = () => {
     if (timeLeft === null || timeLeft <= 0 || quizSubmitted) return;
 
     const timer = setInterval(() => {
-      setTimeLeft((prev) => (prev !== null ? prev - 1 : null));
+      setTimeLeft((prev) => {
+        if (prev !== null && prev > 0) {
+          return prev - 1;
+        } else {
+          clearInterval(timer);
+          handleSubmitQuiz();
+          return 0;
+        }
+      });
     }, 1000);
 
     return () => clearInterval(timer);
@@ -123,102 +120,145 @@ const TakeQuiz = () => {
   };
 
   const handleSubmitQuiz = async () => {
-    // Here you would typically send the answers to your backend
-    // For now, we'll just set the quiz as submitted
-    setQuizSubmitted(true);
-    
-    // Navigate to results page
-    router.push(`/quiz-result/${id}`);
+    if (!quiz || typeof id !== 'string') return;
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) throw new Error('No authenticated user found');
+
+      const { data, error } = await supabase
+        .from('quiz_submissions')
+        .insert({
+          student_id: user.id,
+          quiz_id: id,
+          answers: answers,
+          // You can calculate the score here if you have the correct answers
+          // score: calculateScore(answers, quiz.questions),
+        })
+        .select();
+
+      if (error) throw error;
+
+      console.log('Quiz submitted successfully:', data);
+      setQuizSubmitted(true);
+      
+      // Navigate to results page
+      router.push(`/quiz-result/${id}`);
+    } catch (error) {
+      console.error('Error submitting quiz:', error);
+      setSubmitError('Failed to submit quiz. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  if (!quiz) return <div>Loading...</div>;
-
-  if (!quizAvailable) {
-    return (
-      <StudentLayout studentName={studentName} studentId={studentId}>
-        <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl mx-auto">
-            <Card>
-              <Title>{quiz.title}</Title>
-              <Text>This quiz is not yet available. Please check back at the scheduled time.</Text>
-              <Text>Scheduled start: {new Date(quiz.release_date).toLocaleString()}</Text>
-            </Card>
-          </div>
-        </div>
-      </StudentLayout>
-    );
-  }
+  if (!quiz) return <div className="h-screen flex items-center justify-center">Loading quiz...</div>;
 
   const currentQuestion = quiz.questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
 
   return (
-    <StudentLayout studentName={studentName} studentId={studentId}>
-      <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-3xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <Card>
-              <Title>{quiz.title}</Title>
-              <Text>Question {currentQuestionIndex + 1} of {quiz.questions.length}</Text>
-              <ProgressBar value={progress} className="mt-2" />
-              
-              {!quizSubmitted && timeLeft !== null && (
-                <Text className="mt-2">Time left: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</Text>
-              )}
-
-              <div className="mt-6">
-                <Text className="font-semibold">{currentQuestion.text}</Text>
-                <div className="mt-4 space-y-2">
-                  {currentQuestion.options.map((option, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3, delay: index * 0.1 }}
-                    >
-                      <label className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name={`question-${currentQuestion.id}`}
-                          value={option}
-                          checked={answers[currentQuestion.id] === option}
-                          onChange={() => handleAnswer(currentQuestion.id, option)}
-                          className="form-radio h-4 w-4 text-blue-600"
-                        />
-                        <span>{option}</span>
-                      </label>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-8 flex justify-between">
-                <Button
-                  onClick={handlePreviousQuestion}
-                  disabled={currentQuestionIndex === 0}
-                  color="gray"
-                >
-                  Previous
-                </Button>
-                {currentQuestionIndex === quiz.questions.length - 1 ? (
-                  <Button onClick={handleSubmitQuiz} color="green">
-                    Submit Quiz
-                  </Button>
-                ) : (
-                  <Button onClick={handleNextQuestion} color="blue">
-                    Next
-                  </Button>
-                )}
-              </div>
-            </Card>
-          </motion.div>
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      {/* Header */}
+      <header className="bg-white shadow-md p-4">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-800">{quiz.title}</h1>
+          <div className="text-right">
+            <p className="text-sm text-gray-600">{studentName}</p>
+            <p className="text-sm text-gray-600">Student ID: {studentId}</p>
+          </div>
         </div>
-      </div>
-    </StudentLayout>
+      </header>
+
+      {/* Main content */}
+      <main className="flex-grow flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="bg-white shadow-xl rounded-lg p-8 max-w-3xl w-full"
+        >
+          {/* Timer */}
+          <div className="mb-6 text-center">
+            <p className="text-xl font-semibold">
+              Time left: {Math.floor(timeLeft! / 60)}:{(timeLeft! % 60).toString().padStart(2, '0')}
+            </p>
+          </div>
+
+          {/* Progress bar */}
+          <div className="mb-6 bg-gray-200 rounded-full h-2.5">
+            <div
+              className="bg-blue-600 h-2.5 rounded-full"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+
+          {/* Question */}
+          <h2 className="text-xl font-bold mb-4">
+            Question {currentQuestionIndex + 1} of {quiz.questions.length}
+          </h2>
+          <p className="text-lg mb-6">{currentQuestion.text}</p>
+
+          {/* Options */}
+          <div className="space-y-4 mb-8">
+            {currentQuestion.options.map((option, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.1 }}
+              >
+                <label className="flex items-center space-x-3 p-3 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200 transition duration-150">
+                  <input
+                    type="radio"
+                    name={`question-${currentQuestion.id}`}
+                    value={option}
+                    checked={answers[currentQuestion.id] === option}
+                    onChange={() => handleAnswer(currentQuestion.id, option)}
+                    className="form-radio h-5 w-5 text-blue-600"
+                  />
+                  <span className="text-gray-700">{option}</span>
+                </label>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Navigation buttons */}
+          <div className="flex justify-between">
+            <button
+              onClick={handlePreviousQuestion}
+              disabled={currentQuestionIndex === 0}
+              className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition duration-150 disabled:opacity-50"
+            >
+              Previous
+            </button>
+            {currentQuestionIndex === quiz.questions.length - 1 ? (
+              <button
+                onClick={handleSubmitQuiz}
+                disabled={isSubmitting}
+                className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
+              </button>
+            ) : (
+              <button
+                onClick={handleNextQuestion}
+                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-150"
+              >
+                Next
+              </button>
+            )}
+          </div>
+
+          {submitError && (
+            <p className="mt-4 text-red-500 text-center">{submitError}</p>
+          )}
+        </motion.div>
+      </main>
+    </div>
   );
 };
 

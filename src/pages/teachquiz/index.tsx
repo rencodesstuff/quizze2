@@ -1,3 +1,5 @@
+// File: pages/teachquiz/index.tsx
+
 import React, { useState, useEffect } from "react";
 import TeacherLayout from "@/comps/teacher-layout";
 import Link from "next/link";
@@ -67,7 +69,7 @@ const MyQuizzes = () => {
       <div className="bg-white shadow-md rounded-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-800">My Quizzes</h1>
-          <Link href="/createquiz" passHref>
+          <Link href="/teachquiz/createquiz" passHref>
             <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-300">
               Create New Quiz
             </button>
@@ -98,7 +100,7 @@ const MyQuizzes = () => {
                     <td className="py-4 px-4">{new Date(quiz.created_at).toLocaleString()}</td>
                     <td className="py-4 px-4">{quiz.code || 'N/A'}</td>
                     <td className="py-4 px-4">
-                      <Link href={`/editquiz/${quiz.id}`}>
+                      <Link href={`/teachquiz/editquiz/${quiz.id}`}>
                         <button className="text-blue-600 hover:text-blue-800 mr-2">Edit</button>
                       </Link>
                       <button 
