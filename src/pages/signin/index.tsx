@@ -46,16 +46,20 @@ const SignInPage = () => {
         if (roleError) throw roleError;
 
         // Redirect based on role
-        if (roleData.role === 'student') {
-          router.push('/studentdash');
-        } else if (roleData.role === 'teacher') {
-          router.push('/teachdash');
-        } else {
-          // Handle other roles or unexpected cases
-          console.error('Unknown user role');
-          // You might want to sign out the user here
-          await supabase.auth.signOut();
-          alert('Unknown user role. Please contact support.');
+        switch(roleData.role) {
+          case 'student':
+            router.push('/studentdash');
+            break;
+          case 'teacher':
+            router.push('/teachdash');
+            break;
+          case 'admin':
+            router.push('/admindashboard'); // New redirection for admin
+            break;
+          default:
+            console.error('Unknown user role');
+            await supabase.auth.signOut();
+            alert('Unknown user role. Please contact support.');
         }
       }
     } catch (error) {

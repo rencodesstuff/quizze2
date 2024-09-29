@@ -103,19 +103,29 @@ const MyQuizzes: React.FC = () => {
           );
         });
   
+      // Fetch quiz submissions for this student
+      const { data: submissionData, error: submissionError } = await supabase
+        .from('quiz_submissions')
+        .select('quiz_id')
+        .eq('student_id', userId);
+  
+      if (submissionError) throw submissionError;
+  
+      const submittedQuizIds = new Set(submissionData.map(submission => submission.quiz_id));
+  
       const joined = allJoinedQuizzes.filter(quiz => {
         const quizDate = new Date(quiz.release_date);
         return quizDate > oneWeekFromNow;
       });
-
+  
       const upcoming = allJoinedQuizzes.filter(quiz => {
         const quizDate = new Date(quiz.release_date);
-        return quizDate > now && quizDate <= oneWeekFromNow;
+        return quizDate > now && quizDate <= oneWeekFromNow && !submittedQuizIds.has(quiz.id);
       });
-
+  
       const recent = allJoinedQuizzes.filter(quiz => {
         const quizDate = new Date(quiz.release_date);
-        return quizDate <= now;
+        return (quizDate <= now && submittedQuizIds.has(quiz.id)) || (quizDate <= now && quizDate < new Date(now.getTime() - 24 * 60 * 60 * 1000));
       });
   
       setJoinedQuizzes(joined);

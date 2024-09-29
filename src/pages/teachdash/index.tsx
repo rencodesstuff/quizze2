@@ -2,6 +2,12 @@ import React from "react";
 import TeacherLayout from "@/comps/teacher-layout";
 import { Tab } from '@headlessui/react';
 import { FaClipboardList, FaUserGraduate, FaBell, FaCalendarAlt } from 'react-icons/fa';
+import { createClient } from "../../../utils/supabase/server-props";
+
+interface TeacherDashboardProps {
+  user: any;
+  teacherName: string;
+}
 
 const TeacherDashboard: React.FC = () => {
   return (
