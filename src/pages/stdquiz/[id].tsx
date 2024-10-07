@@ -2,6 +2,7 @@ import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { createClient } from "../../../utils/supabase/component";
+import { MultiStepLoader } from '@/ui/multi-step-loader';
 
 interface Question {
   id: string;
@@ -19,6 +20,10 @@ interface Quiz {
   questions: Question[];
 }
 
+interface LoadingState {
+  text: string;
+}
+
 const TakeQuiz = () => {
   const router = useRouter();
   const { id } = router.query;
@@ -31,7 +36,16 @@ const TakeQuiz = () => {
   const [studentId, setStudentId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [submissionStep, setSubmissionStep] = useState(0);
   const supabase = createClient();
+
+  const loadingStates: LoadingState[] = [
+    { text: "Validating" },
+    { text: "Uploading" },
+    { text: "Processing" },
+    { text: "Finalizing" }
+  ];
 
   useEffect(() => {
     const fetchQuizAndStudentInfo = async () => {
@@ -119,6 +133,14 @@ const TakeQuiz = () => {
     }
   };
 
+  const handleShowConfirmation = () => {
+    if (quiz && Object.keys(answers).length === quiz.questions.length) {
+      setShowConfirmation(true);
+    } else {
+      alert("Please answer all questions before submitting.");
+    }
+  };
+
   const handleSubmitQuiz = async () => {
     if (!quiz || typeof id !== 'string') return;
     setIsSubmitting(true);
@@ -128,6 +150,13 @@ const TakeQuiz = () => {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
       if (!user) throw new Error('No authenticated user found');
+
+      // Update loading states as the submission progresses
+      setSubmissionStep(0);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setSubmissionStep(1);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setSubmissionStep(2);
 
       const { data, error } = await supabase
         .from('quiz_submissions')
@@ -141,6 +170,9 @@ const TakeQuiz = () => {
         .select();
 
       if (error) throw error;
+
+      setSubmissionStep(3);
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       console.log('Quiz submitted successfully:', data);
       setQuizSubmitted(true);
@@ -160,9 +192,69 @@ const TakeQuiz = () => {
   const currentQuestion = quiz.questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
 
+  if (isSubmitting) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
+        <div className="bg-white shadow-xl rounded-lg p-8 max-w-md w-full">
+          <h2 className="text-2xl font-bold mb-6 text-center">Submitting Quiz</h2>
+          <MultiStepLoader
+            loadingStates={loadingStates}
+            loading={isSubmitting}
+          />
+          <p className="mt-6 text-center text-gray-600">Please wait while we submit your quiz...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (showConfirmation) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex flex-col">
+        <header className="bg-white shadow-md p-4">
+          <div className="max-w-7xl mx-auto flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-gray-800">Confirm Submission</h1>
+            <div className="text-right">
+              <p className="text-sm text-gray-600">{studentName}</p>
+              <p className="text-sm text-gray-600">Student ID: {studentId}</p>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-grow flex items-center justify-center p-4">
+          <div className="bg-white shadow-xl rounded-lg p-8 max-w-3xl w-full">
+            <h2 className="text-2xl font-bold mb-4">Review Your Answers</h2>
+            {quiz.questions.map((question, index) => (
+              <div key={question.id} className="mb-6">
+                <p className="font-semibold">Question {index + 1}: {question.text}</p>
+                <p className="text-blue-600">Your answer: {answers[question.id]}</p>
+              </div>
+            ))}
+            <div className="flex justify-between mt-8">
+              <button
+                onClick={() => setShowConfirmation(false)}
+                className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition duration-150"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleSubmitQuiz}
+                disabled={isSubmitting}
+                className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Submitting...' : 'Confirm Submission'}
+              </button>
+            </div>
+            {submitError && (
+              <p className="mt-4 text-red-500 text-center">{submitError}</p>
+            )}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Header */}
       <header className="bg-white shadow-md p-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-800">{quiz.title}</h1>
@@ -173,7 +265,6 @@ const TakeQuiz = () => {
         </div>
       </header>
 
-      {/* Main content */}
       <main className="flex-grow flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -181,14 +272,12 @@ const TakeQuiz = () => {
           transition={{ duration: 0.5 }}
           className="bg-white shadow-xl rounded-lg p-8 max-w-3xl w-full"
         >
-          {/* Timer */}
           <div className="mb-6 text-center">
             <p className="text-xl font-semibold">
               Time left: {Math.floor(timeLeft! / 60)}:{(timeLeft! % 60).toString().padStart(2, '0')}
             </p>
           </div>
 
-          {/* Progress bar */}
           <div className="mb-6 bg-gray-200 rounded-full h-2.5">
             <div
               className="bg-blue-600 h-2.5 rounded-full"
@@ -196,13 +285,11 @@ const TakeQuiz = () => {
             ></div>
           </div>
 
-          {/* Question */}
           <h2 className="text-xl font-bold mb-4">
             Question {currentQuestionIndex + 1} of {quiz.questions.length}
           </h2>
           <p className="text-lg mb-6">{currentQuestion.text}</p>
 
-          {/* Options */}
           <div className="space-y-4 mb-8">
             {currentQuestion.options.map((option, index) => (
               <motion.div
@@ -226,7 +313,6 @@ const TakeQuiz = () => {
             ))}
           </div>
 
-          {/* Navigation buttons */}
           <div className="flex justify-between">
             <button
               onClick={handlePreviousQuestion}
@@ -237,11 +323,10 @@ const TakeQuiz = () => {
             </button>
             {currentQuestionIndex === quiz.questions.length - 1 ? (
               <button
-                onClick={handleSubmitQuiz}
-                disabled={isSubmitting}
-                className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150 disabled:opacity-50"
+                onClick={handleShowConfirmation}
+                className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150"
               >
-                {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
+                Review Answers
               </button>
             ) : (
               <button
@@ -252,10 +337,6 @@ const TakeQuiz = () => {
               </button>
             )}
           </div>
-
-          {submitError && (
-            <p className="mt-4 text-red-500 text-center">{submitError}</p>
-          )}
         </motion.div>
       </main>
     </div>

@@ -103,7 +103,7 @@ const SignInPage = () => {
                     placeholder='username@student.gmi.edu.my'
                     autoComplete="email"
                     required
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition duration-200"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition duration-200 text-white placeholder-gray-400"
                   />
                 </div>
                 <div>
@@ -118,7 +118,7 @@ const SignInPage = () => {
                     placeholder='*******'
                     autoComplete="current-password"
                     required
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition duration-200"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition duration-200 text-white placeholder-gray-400"
                   />
                 </div>
                 <button
