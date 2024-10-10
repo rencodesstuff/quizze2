@@ -125,7 +125,7 @@ const AdminDashboard = () => {
               Welcome back, Admin!
             </h2>
             <p className="text-gray-600">
-              Here's an overview of the platform's performance.
+              Here&apos;s an overview of the platform&apos;s performance.
             </p>
           </div>
           <button className="px-4 py-2 bg-red-600 text-white rounded-md shadow-md hover:bg-red-700 transition">

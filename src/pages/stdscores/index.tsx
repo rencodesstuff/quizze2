@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Link from "next/link"; // Import Link from next/link
 import TeacherLayout from "@/comps/teacher-layout";
 import { createClient } from "../../../utils/supabase/component";
 
@@ -15,15 +16,9 @@ interface StudentSubmission {
   submitted_at: string;
 }
 
-interface SubmissionData {
-  score: number;
-  submitted_at: string;
-  students: {
-    name: string;
-  }[];
-}
+// Removed unused SubmissionData interface
 
-const TeacherQuizScores = () => {
+const TeacherQuizScores: React.FC = () => {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
   const [studentSubmissions, setStudentSubmissions] = useState<StudentSubmission[]>([]);
@@ -71,7 +66,7 @@ const TeacherQuizScores = () => {
 
       if (error) throw error;
       if (data) {
-        const submissions: StudentSubmission[] = data.map(submission => ({
+        const submissions: StudentSubmission[] = data.map((submission: any) => ({
           student_name: submission.students[0]?.name || 'Unknown',
           score: submission.score,
           submitted_at: submission.submitted_at
@@ -103,10 +98,10 @@ const TeacherQuizScores = () => {
           <div className="text-center">Loading...</div>
         ) : quizzes.length === 0 ? (
           <div className="text-center py-10">
-            <p className="text-xl text-gray-600 mb-4">You haven't created any quizzes yet.</p>
-            <a href="/createquiz" className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-300">
+            <p className="text-xl text-gray-600 mb-4">You haven&apos;t created any quizzes yet.</p>
+            <Link href="/createquiz" className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-300">
               Create Your First Quiz
-            </a>
+            </Link>
           </div>
         ) : (
           <>
