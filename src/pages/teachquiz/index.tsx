@@ -9,7 +9,7 @@ interface Quiz {
   id: string;
   title: string;
   duration_minutes: number | null;
-  release_date: string;
+  release_date: string | null;
   created_at: string;
   code: string | null;
 }
@@ -64,6 +64,11 @@ const MyQuizzes = () => {
     }
   };
 
+  const formatReleaseDate = (date: string | null) => {
+    if (!date) return 'None (Always available)';
+    return new Date(date).toLocaleString();
+  };
+
   return (
     <TeacherLayout>
       <div className="bg-white shadow-md rounded-lg p-6">
@@ -96,7 +101,7 @@ const MyQuizzes = () => {
                   <tr key={quiz.id} className="border-b hover:bg-gray-50">
                     <td className="py-4 px-4">{quiz.title}</td>
                     <td className="py-4 px-4">{quiz.duration_minutes || 'N/A'}</td>
-                    <td className="py-4 px-4">{new Date(quiz.release_date).toLocaleString()}</td>
+                    <td className="py-4 px-4">{formatReleaseDate(quiz.release_date)}</td>
                     <td className="py-4 px-4">{new Date(quiz.created_at).toLocaleString()}</td>
                     <td className="py-4 px-4">{quiz.code || 'N/A'}</td>
                     <td className="py-4 px-4">
