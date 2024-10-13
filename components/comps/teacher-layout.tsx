@@ -96,10 +96,10 @@ const TeacherLayout: React.FC<TeacherLayoutProps> = ({ children }) => {
   console.log("Rendering TeacherLayout:", { teacherName, teacherCourse, isLoading });
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-100 overflow-hidden">
       {isMobile && (
         <button
-          className="fixed top-4 left-4 z-20 bg-white p-2 rounded-md shadow-md"
+          className="fixed top-4 left-4 z-50 bg-white p-2 rounded-md shadow-md"
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         >
           {isSidebarOpen ? (
@@ -114,7 +114,7 @@ const TeacherLayout: React.FC<TeacherLayoutProps> = ({ children }) => {
         className={`${
           isMobile
             ? isSidebarOpen
-              ? "fixed inset-y-0 left-0 z-10 w-64"
+              ? "fixed inset-y-0 left-0 z-40 w-64"
               : "hidden"
             : "relative"
         } md:block transition-all duration-300 ease-in-out`}
@@ -129,14 +129,16 @@ const TeacherLayout: React.FC<TeacherLayoutProps> = ({ children }) => {
         />
       </div>
 
-      <div className={`flex-1 flex flex-col p-4 overflow-hidden ${isMobile ? 'pt-16' : ''}`}>
+      <div className="flex-1 flex flex-col overflow-hidden">
         <TeacherNavbar 
           teacherName={teacherName} 
           teacherCourse={teacherCourse} 
           profilePictureUrl={profilePictureUrl}
           isLoading={isLoading}
         />
-        {children}
+        <div className="flex-1 overflow-y-auto p-4">
+          {children}
+        </div>
       </div>
     </div>
   );

@@ -1,15 +1,17 @@
-import { useRouter } from 'next/router';
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useRouter } from "next/router";
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { createClient } from "../../../utils/supabase/component";
-import { MultiStepLoader } from '@/ui/multi-step-loader';
+import { MultiStepLoader } from "@/ui/multi-step-loader";
+import Image from "next/image";
 
 interface Question {
   id: string;
   type: string;
   text: string;
-  options: string[];
+  options: string[] | null;
   correct_answer: string;
+  image_url?: string;
 }
 
 interface Quiz {
@@ -44,32 +46,32 @@ const TakeQuiz = () => {
     { text: "Validating" },
     { text: "Uploading" },
     { text: "Processing" },
-    { text: "Finalizing" }
+    { text: "Finalizing" },
   ];
 
   useEffect(() => {
     const fetchQuizAndStudentInfo = async () => {
-      if (typeof id !== 'string') return;
+      if (typeof id !== "string") return;
 
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError) throw userError;
-        if (!user) throw new Error('No authenticated user found');
+        if (!user) throw new Error("No authenticated user found");
 
         const { data: studentData, error: studentError } = await supabase
-          .from('students')
-          .select('name, student_id')
-          .eq('id', user.id)
+          .from("students")
+          .select("name, student_id")
+          .eq("id", user.id)
           .single();
 
         if (studentError) throw studentError;
-        if (!studentData) throw new Error('No student data found');
+        if (!studentData) throw new Error("No student data found");
 
         setStudentName(studentData.name);
         setStudentId(studentData.student_id);
 
         const { data: quizData, error: quizError } = await supabase
-          .from('quizzes')
+          .from("quizzes")
           .select(`
             id,
             title,
@@ -80,19 +82,33 @@ const TakeQuiz = () => {
               type,
               text,
               options,
-              correct_answer
+              correct_answer,
+              image_url
             )
           `)
-          .eq('id', id)
+          .eq("id", id)
           .single();
 
         if (quizError) throw quizError;
 
-        setQuiz(quizData as Quiz);
+        const transformedQuizData = {
+          ...quizData,
+          questions: quizData.questions.map((question: Question) => ({
+            ...question,
+            options: question.type.toLowerCase().includes("multiple_choice")
+              ? Array.isArray(question.options)
+                ? question.options
+                : typeof question.options === "string"
+                ? JSON.parse(question.options)
+                : []
+              : null,
+          })),
+        };
+
+        setQuiz(transformedQuizData as Quiz);
         setTimeLeft(quizData.duration_minutes * 60);
       } catch (error) {
-        console.error('Error fetching quiz or student info:', error);
-        // Handle error (e.g., show error message to user)
+        console.error("Error fetching quiz or student info:", error);
       }
     };
 
@@ -133,61 +149,167 @@ const TakeQuiz = () => {
     }
   };
 
-  const handleShowConfirmation = () => {
-    if (quiz && Object.keys(answers).length === quiz.questions.length) {
-      setShowConfirmation(true);
-    } else {
-      alert("Please answer all questions before submitting.");
+  const handleSkipQuestion = () => {
+    if (quiz && currentQuestionIndex < quiz.questions.length - 1) {
+      setCurrentQuestionIndex((prev) => prev + 1);
     }
   };
 
+  const handleQuestionSelect = (index: number) => {
+    setCurrentQuestionIndex(index);
+  };
+
+  const handleShowConfirmation = () => {
+    if (quiz && Object.keys(answers).length > 0) {
+      setShowConfirmation(true);
+    } else {
+      alert("Please answer at least one question before submitting.");
+    }
+  };
+
+  const calculateScore = (
+    userAnswers: Record<string, string>,
+    questions: Question[]
+  ): number => {
+    let correctAnswers = 0;
+    questions.forEach((question) => {
+      if (
+        userAnswers[question.id]?.toLowerCase() ===
+        question.correct_answer.toLowerCase()
+      ) {
+        correctAnswers++;
+      }
+    });
+    return Math.round((correctAnswers / questions.length) * 100);
+  };
+
   const handleSubmitQuiz = async () => {
-    if (!quiz || typeof id !== 'string') return;
+    if (!quiz || typeof id !== "string") return;
     setIsSubmitting(true);
     setSubmitError(null);
 
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
-      if (!user) throw new Error('No authenticated user found');
+      if (!user) throw new Error("No authenticated user found");
 
-      // Update loading states as the submission progresses
+      const score = calculateScore(answers, quiz.questions);
+
       setSubmissionStep(0);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       setSubmissionStep(1);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       setSubmissionStep(2);
 
       const { data, error } = await supabase
-        .from('quiz_submissions')
+        .from("quiz_submissions")
         .insert({
           student_id: user.id,
           quiz_id: id,
           answers: answers,
-          // You can calculate the score here if you have the correct answers
-          // score: calculateScore(answers, quiz.questions),
+          score: score,
+          total_questions: quiz.questions.length,
+          correct_answers: Math.round((score / 100) * quiz.questions.length),
         })
         .select();
 
       if (error) throw error;
 
       setSubmissionStep(3);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      console.log('Quiz submitted successfully:', data);
+      console.log("Quiz submitted successfully:", data);
       setQuizSubmitted(true);
-      
-      // Navigate to results page
+
       router.push(`/quiz-result/${id}`);
     } catch (error) {
-      console.error('Error submitting quiz:', error);
-      setSubmitError('Failed to submit quiz. Please try again.');
+      console.error("Error submitting quiz:", error);
+      setSubmitError("Failed to submit quiz. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (!quiz) return <div className="h-screen flex items-center justify-center">Loading quiz...</div>;
+  const renderQuestionOptions = (question: Question) => {
+    const questionType = question.type.toLowerCase().replace(/[^a-z0-9]/g, "_");
+
+    switch (questionType) {
+      case "multiple_choice":
+        return (
+          <div className="space-y-4 mb-8">
+            {question.options &&
+              question.options.map((option, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.1 }}
+                >
+                  <label className="flex items-center space-x-3 p-3 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200 transition duration-150">
+                    <input
+                      type="radio"
+                      name={`question-${question.id}`}
+                      value={option}
+                      checked={answers[question.id] === option}
+                      onChange={() => handleAnswer(question.id, option)}
+                      className="form-radio h-5 w-5 text-blue-600"
+                    />
+                    <span className="text-gray-700">{option}</span>
+                  </label>
+                </motion.div>
+              ))}
+          </div>
+        );
+      case "true_false":
+      case "true_or_false":
+        return (
+          <div className="space-y-4 mb-8">
+            {["True", "False"].map((option, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.1 }}
+              >
+                <label className="flex items-center space-x-3 p-3 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200 transition duration-150">
+                  <input
+                    type="radio"
+                    name={`question-${question.id}`}
+                    value={option}
+                    checked={answers[question.id] === option}
+                    onChange={() => handleAnswer(question.id, option)}
+                    className="form-radio h-5 w-5 text-blue-600"
+                  />
+                  <span className="text-gray-700">{option}</span>
+                </label>
+              </motion.div>
+            ))}
+          </div>
+        );
+      case "short_answer":
+        return (
+          <div className="mb-8">
+            <textarea
+              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={4}
+              value={answers[question.id] || ""}
+              onChange={(e) => handleAnswer(question.id, e.target.value)}
+              placeholder="Type your answer here..."
+            />
+          </div>
+        );
+      default:
+        console.log("Unsupported question type:", question.type);
+        return <p>Unsupported question type: {question.type}</p>;
+    }
+  };
+
+  if (!quiz)
+    return (
+      <div className="h-screen flex items-center justify-center">
+        Loading quiz...
+      </div>
+    );
 
   const currentQuestion = quiz.questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
@@ -196,12 +318,16 @@ const TakeQuiz = () => {
     return (
       <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
         <div className="bg-white shadow-xl rounded-lg p-8 max-w-md w-full">
-          <h2 className="text-2xl font-bold mb-6 text-center">Submitting Quiz</h2>
+          <h2 className="text-2xl font-bold mb-6 text-center">
+            Submitting Quiz
+          </h2>
           <MultiStepLoader
             loadingStates={loadingStates}
             loading={isSubmitting}
           />
-          <p className="mt-6 text-center text-gray-600">Please wait while we submit your quiz...</p>
+          <p className="mt-6 text-center text-gray-600">
+            Please wait while we submit your quiz...
+          </p>
         </div>
       </div>
     );
@@ -212,7 +338,9 @@ const TakeQuiz = () => {
       <div className="min-h-screen bg-gray-100 flex flex-col">
         <header className="bg-white shadow-md p-4">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-800">Confirm Submission</h1>
+            <h1 className="text-2xl font-bold text-gray-800">
+              Confirm Submission
+            </h1>
             <div className="text-right">
               <p className="text-sm text-gray-600">{studentName}</p>
               <p className="text-sm text-gray-600">Student ID: {studentId}</p>
@@ -225,8 +353,16 @@ const TakeQuiz = () => {
             <h2 className="text-2xl font-bold mb-4">Review Your Answers</h2>
             {quiz.questions.map((question, index) => (
               <div key={question.id} className="mb-6">
-                <p className="font-semibold">Question {index + 1}: {question.text}</p>
-                <p className="text-blue-600">Your answer: {answers[question.id]}</p>
+                <p className="font-semibold">
+                  Question {index + 1}: {question.text}
+                </p>
+                {answers[question.id] ? (
+                  <p className="text-blue-600">
+                    Your answer: {answers[question.id]}
+                  </p>
+                ) : (
+                  <p className="text-yellow-600">Skipped</p>
+                )}
               </div>
             ))}
             <div className="flex justify-between mt-8">
@@ -241,7 +377,7 @@ const TakeQuiz = () => {
                 disabled={isSubmitting}
                 className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150 disabled:opacity-50"
               >
-                {isSubmitting ? 'Submitting...' : 'Confirm Submission'}
+                {isSubmitting ? "Submitting..." : "Confirm Submission"}
               </button>
             </div>
             {submitError && (
@@ -261,86 +397,98 @@ const TakeQuiz = () => {
           <div className="text-right">
             <p className="text-sm text-gray-600">{studentName}</p>
             <p className="text-sm text-gray-600">Student ID: {studentId}</p>
+            <p className="text-sm font-bold text-blue-600">
+              Time left: {Math.floor(timeLeft! / 60)}:
+              {(timeLeft! % 60).toString().padStart(2, "0")}
+            </p>
           </div>
         </div>
       </header>
 
-      <main className="flex-grow flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="bg-white shadow-xl rounded-lg p-8 max-w-3xl w-full"
-        >
-          <div className="mb-6 text-center">
-            <p className="text-xl font-semibold">
-              Time left: {Math.floor(timeLeft! / 60)}:{(timeLeft! % 60).toString().padStart(2, '0')}
-            </p>
-          </div>
-
-          <div className="mb-6 bg-gray-200 rounded-full h-2.5">
-            <div
-              className="bg-blue-600 h-2.5 rounded-full"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-
-          <h2 className="text-xl font-bold mb-4">
-            Question {currentQuestionIndex + 1} of {quiz.questions.length}
-          </h2>
-          <p className="text-lg mb-6">{currentQuestion.text}</p>
-
-          <div className="space-y-4 mb-8">
-            {currentQuestion.options.map((option, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.1 }}
-              >
-                <label className="flex items-center space-x-3 p-3 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200 transition duration-150">
-                  <input
-                    type="radio"
-                    name={`question-${currentQuestion.id}`}
-                    value={option}
-                    checked={answers[currentQuestion.id] === option}
-                    onChange={() => handleAnswer(currentQuestion.id, option)}
-                    className="form-radio h-5 w-5 text-blue-600"
-                  />
-                  <span className="text-gray-700">{option}</span>
-                </label>
-              </motion.div>
-            ))}
-          </div>
-
-          <div className="flex justify-between">
-            <button
-              onClick={handlePreviousQuestion}
-              disabled={currentQuestionIndex === 0}
-              className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition duration-150 disabled:opacity-50"
-            >
-              Previous
-            </button>
-            {currentQuestionIndex === quiz.questions.length - 1 ? (
+      <main className="flex-grow flex p-4">
+        <div className="w-1/4 bg-white shadow-xl rounded-lg p-4 mr-4">
+          <h2 className="text-lg font-bold mb-4">Questions</h2>
+          <div className="space-y-2">
+            {quiz.questions.map((q, index) => (
               <button
-                onClick={handleShowConfirmation}
-                className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150"
+              key={q.id}
+              onClick={() => handleQuestionSelect(index)}
+              className={`w-full text-left p-2 rounded ${
+                index === currentQuestionIndex
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 hover:bg-gray-200'
+              }`}
+            >
+              Question {index + 1}
+              {answers[q.id] && answers[q.id].trim() !== "" && (
+                <span className="ml-2 text-green-500">✓</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="flex-grow bg-white shadow-xl rounded-lg p-8"
+      >
+        <h2 className="text-xl font-bold mb-4">
+          Question {currentQuestionIndex + 1} of {quiz.questions.length}
+        </h2>
+        <p className="text-lg mb-6">{currentQuestion.text}</p>
+
+        {currentQuestion.image_url && (
+          <div className="mb-6">
+            <Image
+              src={currentQuestion.image_url}
+              alt={`Image for question ${currentQuestionIndex + 1}`}
+              width={400}
+              height={300}
+              layout="responsive"
+            />
+          </div>
+        )}
+
+        {renderQuestionOptions(currentQuestion)}
+
+        <div className="flex justify-between mt-6">
+          <button
+            onClick={handlePreviousQuestion}
+            disabled={currentQuestionIndex === 0}
+            className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition duration-150 disabled:opacity-50"
+          >
+            Previous
+          </button>
+          {currentQuestionIndex === quiz.questions.length - 1 ? (
+            <button
+              onClick={handleShowConfirmation}
+              className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150"
+            >
+              Review Answers
+            </button>
+          ) : (
+            <div>
+              <button
+                onClick={handleSkipQuestion}
+                className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition duration-150 mr-2"
               >
-                Review Answers
+                Skip
               </button>
-            ) : (
               <button
                 onClick={handleNextQuestion}
                 className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-150"
               >
                 Next
               </button>
-            )}
-          </div>
-        </motion.div>
-      </main>
-    </div>
-  );
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </main>
+  </div>
+);
 };
 
 export default TakeQuiz;

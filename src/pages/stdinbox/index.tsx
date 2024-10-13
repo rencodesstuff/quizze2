@@ -1,52 +1,25 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Card, Title, Text, TabGroup, TabList, Tab, TabPanels, TabPanel } from "@tremor/react";
-import { SearchIcon, MailIcon, TrashIcon, StarIcon } from "@heroicons/react/outline";
+import { Card, Title, Text, DonutChart, Flex, Select, SelectItem, Badge, Grid } from "@tremor/react";
+import { ClockIcon, AcademicCapIcon, SortAscendingIcon, ChartPieIcon, BookOpenIcon } from "@heroicons/react/outline";
 import StudentLayout from "@/comps/student-layout";
 import { createClient } from "../../../utils/supabase/component";
 
-type Message = {
+type QuizResult = {
   id: number;
-  sender: string;
-  subject: string;
+  title: string;
+  score: number;
+  totalQuestions: number;
   date: string;
-  content: string;
-  unread: boolean;
+  duration: number;
 };
 
-const messages: Message[] = [
-  {
-    id: 1,
-    sender: "Professor Smith",
-    subject: "Quiz Reminder",
-    date: "2024-07-15",
-    content: "Dear student, This is a reminder about the upcoming quiz on Monday. Make sure to review chapters 5-7. Good luck!",
-    unread: true
-  },
-  {
-    id: 2,
-    sender: "System Notification",
-    subject: "New Quiz Available",
-    date: "2024-07-14",
-    content: "A new quiz has been added to your dashboard. Please complete it by Friday, July 19th.",
-    unread: false
-  },
-  {
-    id: 3,
-    sender: "Study Group",
-    subject: "Study Session",
-    date: "2024-07-13",
-    content: "Hi everyone, We're organizing a study session for the upcoming exam. It will be held in the library on Thursday at 6 PM. Hope to see you there!",
-    unread: false
-  }
-];
-
-const StudentInbox: React.FC = () => {
-  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+const StudentQuizHistory: React.FC = () => {
   const [studentName, setStudentName] = useState("");
   const [studentId, setStudentId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
+  const [sortBy, setSortBy] = useState("date");
 
   const supabase = createClient();
 
@@ -54,25 +27,18 @@ const StudentInbox: React.FC = () => {
     const fetchStudentInfo = async () => {
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
-        if (userError) {
-          throw new Error(`Error fetching user: ${userError.message}`);
-        }
-
+        if (userError) throw new Error(`Error fetching user: ${userError.message}`);
         if (user) {
           const { data, error } = await supabase
             .from('students')
             .select('name, student_id')
             .eq('id', user.id)
             .single();
-
-          if (error) {
-            throw new Error(`Error fetching student info: ${error.message}`);
-          }
-
+          if (error) throw new Error(`Error fetching student info: ${error.message}`);
           if (data) {
             setStudentName(data.name);
             setStudentId(data.student_id);
+            await fetchQuizResults(user.id);
           } else {
             throw new Error('No student data found');
           }
@@ -81,114 +47,151 @@ const StudentInbox: React.FC = () => {
         }
       } catch (err) {
         console.error('Error in fetchStudentInfo:', err);
-        // You might want to handle this error more gracefully in a production app
       } finally {
         setLoading(false);
       }
     };
-
     fetchStudentInfo();
   }, []);
 
-  const filteredMessages = messages.filter(message =>
-    message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    message.sender.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const fetchQuizResults = async (userId: string) => {
+    // Placeholder data
+    const mockResults: QuizResult[] = [
+      { id: 1, title: "Math Quiz 1", score: 85, totalQuestions: 20, date: "2024-07-15", duration: 30 },
+      { id: 2, title: "Science Quiz", score: 92, totalQuestions: 25, date: "2024-07-10", duration: 45 },
+      { id: 3, title: "History Test", score: 78, totalQuestions: 30, date: "2024-07-05", duration: 60 },
+      { id: 4, title: "English Essay", score: 88, totalQuestions: 1, date: "2024-07-01", duration: 90 },
+      { id: 5, title: "Geography Quiz", score: 95, totalQuestions: 15, date: "2024-06-28", duration: 25 },
+      // Add more mock results to simulate a longer list
+      ...[...Array(10)].map((_, i) => ({
+        id: i + 6,
+        title: `Additional Quiz ${i + 1}`,
+        score: Math.floor(Math.random() * 100),
+        totalQuestions: Math.floor(Math.random() * 30) + 10,
+        date: new Date(2024, 6, 27 - i).toISOString().split('T')[0],
+        duration: Math.floor(Math.random() * 60) + 15
+      }))
+    ];
+    setQuizResults(mockResults);
+  };
+
+  const sortedResults = [...quizResults].sort((a, b) => {
+    if (sortBy === "score") return (b.score / b.totalQuestions) - (a.score / a.totalQuestions);
+    if (sortBy === "date") return new Date(b.date).getTime() - new Date(a.date).getTime();
+    return 0;
+  });
+
+  const getScoreColor = (score: number, totalQuestions: number) => {
+    const percentage = (score / totalQuestions) * 100;
+    if (percentage >= 90) return "bg-green-500 text-white";
+    if (percentage >= 70) return "bg-yellow-500 text-black";
+    return "bg-red-500 text-white";
+  };
+
+  const calculateAverageScore = () => {
+    const totalScore = quizResults.reduce((sum, quiz) => sum + (quiz.score / quiz.totalQuestions), 0);
+    return (totalScore / quizResults.length) * 100;
+  };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="flex justify-center items-center h-screen">
+      <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900"></div>
+    </div>;
   }
 
   return (
     <StudentLayout studentName={studentName} studentId={studentId}>
-      <div className="p-6">
-        <Title>Student Inbox</Title>
-        <Text>Manage your messages and notifications</Text>
+      <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
+        <Title className="text-2xl font-bold text-gray-800 mb-2">Quiz History</Title>
+        <Text className="text-gray-600 mb-6">View and analyze your quiz performance</Text>
 
-        <Card className="mt-6">
-          <div className="flex items-center mb-4">
-            <SearchIcon className="h-5 w-5 text-gray-400 mr-2" />
-            <input
-              type="text"
-              placeholder="Search messages..."
-              className="flex-grow p-2 border rounded-md"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <Card>
+            <Flex justifyContent="start" alignItems="center" className="mb-4">
+              <ChartPieIcon className="h-6 w-6 text-blue-500 mr-2" />
+              <Title className="text-lg font-semibold">Performance Overview</Title>
+            </Flex>
+            <DonutChart
+              className="h-48"
+              data={sortedResults.map(result => ({
+                name: result.title,
+                score: (result.score / result.totalQuestions) * 100
+              }))}
+              category="score"
+              index="name"
+              valueFormatter={(number) => `${number.toFixed(1)}%`}
+              colors={["slate", "violet", "indigo", "rose", "cyan", "amber"]}
             />
+          </Card>
+          <Card>
+            <Flex justifyContent="start" alignItems="center" className="mb-4">
+              <BookOpenIcon className="h-6 w-6 text-green-500 mr-2" />
+              <Title className="text-lg font-semibold">Average Score</Title>
+            </Flex>
+            <DonutChart
+              className="h-48"
+              data={[
+                { name: "Average Score", score: calculateAverageScore() },
+                { name: "Remaining", score: 100 - calculateAverageScore() }
+              ]}
+              category="score"
+              index="name"
+              valueFormatter={(number) => `${number.toFixed(1)}%`}
+              colors={["green", "gray"]}
+            />
+          </Card>
+        </div>
+
+        <Card>
+          <Flex justifyContent="between" alignItems="center" className="mb-4">
+            <Title className="text-xl font-semibold">Quiz Results</Title>
+            <Select value={sortBy} onValueChange={setSortBy} className="w-40">
+              <SelectItem value="date" icon={ClockIcon}>Sort by Date</SelectItem>
+              <SelectItem value="score" icon={SortAscendingIcon}>Sort by Score</SelectItem>
+            </Select>
+          </Flex>
+          <div className="space-y-4">
+            {sortedResults.map((result, index) => (
+              <motion.div
+                key={result.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.1 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+              >
+                <Card className="hover:shadow-lg transition-shadow duration-200">
+                  <Flex justifyContent="between" alignItems="start">
+                    <div>
+                      <Title className="text-lg font-semibold mb-2">{result.title}</Title>
+                      <Badge 
+                        size="xl"
+                        className={`${getScoreColor(result.score, result.totalQuestions)} px-3 py-1 rounded-full mb-2`}
+                      >
+                        Score: {result.score}/{result.totalQuestions}
+                      </Badge>
+                    </div>
+                    <Text className="text-right text-sm text-gray-500 font-medium">
+                      {new Date(result.date).toLocaleDateString()}
+                    </Text>
+                  </Flex>
+                  <Flex justifyContent="start" alignItems="center" className="mt-2">
+                    <Text className="text-sm text-gray-600 mr-4">
+                      <ClockIcon className="inline-block h-4 w-4 mr-1" />
+                      {result.duration} mins
+                    </Text>
+                    <Text className="text-sm text-gray-600">
+                      <AcademicCapIcon className="inline-block h-4 w-4 mr-1" />
+                      {result.totalQuestions} questions
+                    </Text>
+                  </Flex>
+                </Card>
+              </motion.div>
+            ))}
           </div>
-
-          <TabGroup>
-            <TabList>
-              <Tab icon={MailIcon}>Inbox</Tab>
-              <Tab icon={StarIcon}>Starred</Tab>
-              <Tab icon={TrashIcon}>Trash</Tab>
-            </TabList>
-            <TabPanels>
-              <TabPanel>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Message List */}
-                  <div className="col-span-1 overflow-y-auto max-h-[70vh]">
-                    {filteredMessages.map((message) => (
-                      <motion.div
-                        key={message.id}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setSelectedMessage(message)}
-                        className={`p-4 mb-2 rounded-lg cursor-pointer ${
-                          message.unread ? 'bg-blue-50' : 'bg-white'
-                        } ${selectedMessage?.id === message.id ? 'border-2 border-blue-500' : 'border border-gray-200'}`}
-                      >
-                        <div className="font-semibold">{message.sender}</div>
-                        <div className="text-sm text-gray-600 truncate">{message.subject}</div>
-                        <div className="text-xs text-gray-400 mt-1">{message.date}</div>
-                      </motion.div>
-                    ))}
-                  </div>
-
-                  {/* Message Content */}
-                  <div className="col-span-2 bg-white rounded-lg p-6 border border-gray-200">
-                    {selectedMessage ? (
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3 }}
-                      >
-                        <h2 className="text-xl font-semibold mb-2">{selectedMessage.subject}</h2>
-                        <div className="flex justify-between text-sm text-gray-600 mb-4">
-                          <span>From: {selectedMessage.sender}</span>
-                          <span>{selectedMessage.date}</span>
-                        </div>
-                        <p className="text-gray-800">{selectedMessage.content}</p>
-                        <div className="mt-6">
-                          <button className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition">
-                            Reply
-                          </button>
-                        </div>
-                      </motion.div>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-gray-500">
-                        Select a message to view its content
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </TabPanel>
-              <TabPanel>
-                <div className="text-center text-gray-500 py-8">
-                  No starred messages
-                </div>
-              </TabPanel>
-              <TabPanel>
-                <div className="text-center text-gray-500 py-8">
-                  Trash is empty
-                </div>
-              </TabPanel>
-            </TabPanels>
-          </TabGroup>
         </Card>
       </div>
     </StudentLayout>
   );
 };
 
-export default StudentInbox;
+export default StudentQuizHistory;

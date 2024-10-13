@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import Link from "next/link"; // Import Link from next/link
+import Link from "next/link";
 import TeacherLayout from "@/comps/teacher-layout";
 import { createClient } from "../../../utils/supabase/component";
 
@@ -14,9 +14,9 @@ interface StudentSubmission {
   student_name: string;
   score: number;
   submitted_at: string;
+  total_questions: number;
+  answered_questions: number;
 }
-
-// Removed unused SubmissionData interface
 
 const TeacherQuizScores: React.FC = () => {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -60,16 +60,31 @@ const TeacherQuizScores: React.FC = () => {
         .select(`
           score,
           submitted_at,
-          students (name)
+          students (name),
+          quiz_id,
+          answers
         `)
         .eq('quiz_id', quizId);
 
       if (error) throw error;
+
+      // Fetch total number of questions for the quiz
+      const { data: questionsData, error: questionsError } = await supabase
+        .from('questions')
+        .select('id')
+        .eq('quiz_id', quizId);
+
+      if (questionsError) throw questionsError;
+
+      const totalQuestions = questionsData.length;
+
       if (data) {
         const submissions: StudentSubmission[] = data.map((submission: any) => ({
           student_name: submission.students[0]?.name || 'Unknown',
           score: submission.score,
-          submitted_at: submission.submitted_at
+          submitted_at: submission.submitted_at,
+          total_questions: totalQuestions,
+          answered_questions: Object.keys(submission.answers).length
         }));
         setStudentSubmissions(submissions);
       }
@@ -139,6 +154,7 @@ const TeacherQuizScores: React.FC = () => {
                       <tr>
                         <th className="py-3 px-4 text-left">Name</th>
                         <th className="py-3 px-4 text-left">Score</th>
+                        <th className="py-3 px-4 text-left">Questions Answered</th>
                         <th className="py-3 px-4 text-left">Submitted At</th>
                       </tr>
                     </thead>
@@ -147,6 +163,7 @@ const TeacherQuizScores: React.FC = () => {
                         <tr key={index} className="border-b hover:bg-gray-50">
                           <td className="py-4 px-4">{submission.student_name}</td>
                           <td className="py-4 px-4">{submission.score}%</td>
+                          <td className="py-4 px-4">{submission.answered_questions} / {submission.total_questions}</td>
                           <td className="py-4 px-4">{new Date(submission.submitted_at).toLocaleString()}</td>
                         </tr>
                       ))}

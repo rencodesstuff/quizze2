@@ -63,10 +63,10 @@ const StudentLayout: React.FC<StudentLayoutProps> = ({ children, studentName, st
   };
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-100 overflow-hidden">
       {isMobile && (
         <button
-          className="fixed top-4 left-4 z-20 bg-white p-2 rounded-md shadow-md"
+          className="fixed top-4 left-4 z-50 bg-white p-2 rounded-md shadow-md"
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         >
           {isSidebarOpen ? (
@@ -81,7 +81,7 @@ const StudentLayout: React.FC<StudentLayoutProps> = ({ children, studentName, st
         className={`${
           isMobile
             ? isSidebarOpen
-              ? "fixed inset-y-0 left-0 z-10 w-64"
+              ? "fixed inset-y-0 left-0 z-40 w-64"
               : "hidden"
             : "relative"
         } md:block transition-all duration-300 ease-in-out`}
@@ -96,13 +96,15 @@ const StudentLayout: React.FC<StudentLayoutProps> = ({ children, studentName, st
         />
       </div>
 
-      <div className={`flex-1 flex flex-col p-4 overflow-hidden ${isMobile ? 'pt-16' : ''}`}>
+      <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar 
           studentName={studentName} 
           studentId={studentId} 
           profilePictureUrl={profilePictureUrl}
         />
-        {children}
+        <div className="flex-1 overflow-y-auto p-4">
+          {children}
+        </div>
       </div>
     </div>
   );

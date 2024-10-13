@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from "next/link";
 import Head from "next/head";
@@ -6,6 +6,15 @@ import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import { createClient } from "../../../utils/supabase/component";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/ui/alert-dialog";
 
 const settings = {
   dots: true,
@@ -18,7 +27,7 @@ const settings = {
   cssEase: "linear",
 };
 
-const SignUpPage = () => {
+const SignUpPage: React.FC = () => {
   const router = useRouter();
   const supabase = createClient();
 
@@ -27,6 +36,7 @@ const SignUpPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,47 +74,49 @@ const SignUpPage = () => {
         }
       });
 
-      if (signUpError) throw signUpError;
-
-      if (authData.user) {
-        console.log("User created in auth:", authData.user);
-
-        // Insert user role
-        const { data: roleData, error: roleError } = await supabase
-          .from('user_roles')
-          .insert({
-            id: authData.user.id,
-            role: 'student',
-          });
-
-        if (roleError) {
-          console.error("Error inserting user role:", roleError);
-          throw roleError;
+      if (signUpError) {
+        if (signUpError.message.includes("User already registered")) {
+          setError("This email is already registered. Please sign in or use a different email.");
+        } else {
+          throw signUpError;
         }
-
-        console.log("User role inserted:", roleData);
-
-        // Insert student data
-        const { data: studentData, error: studentError } = await supabase
-          .from('students')
-          .insert({
-            id: authData.user.id,
-            name,
-            student_id: studentId,
-            email,
-          });
-
-        if (studentError) {
-          console.error("Error inserting student data:", studentError);
-          throw studentError;
-        }
-
-        console.log("Student data inserted:", studentData);
-
-        // Registration successful
-        alert("Registration successful! Please check your email to confirm your account.");
-        router.push('/signin');
+        return;
       }
+
+      if (!authData.user) {
+        throw new Error("User creation failed");
+      }
+
+      // Insert student data
+      const { error: studentError } = await supabase
+        .from('students')
+        .insert({
+          id: authData.user.id,
+          name,
+          student_id: studentId,
+          email,
+        });
+
+      if (studentError) {
+        console.error("Error inserting student data:", studentError);
+        throw studentError;
+      }
+
+      // Insert user role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert({
+          id: authData.user.id,
+          role: 'student',
+        });
+
+      if (roleError) {
+        console.error("Error inserting user role:", roleError);
+        throw roleError;
+      }
+
+      // Registration successful
+      setIsSuccessModalOpen(true);
     } catch (error) {
       console.error("Registration error:", error);
       if (error instanceof Error) {
@@ -224,6 +236,23 @@ const SignUpPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Success Modal */}
+      <AlertDialog open={isSuccessModalOpen} onOpenChange={setIsSuccessModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Registration Successful!</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your account has been created successfully. Please check your email to confirm your account.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => router.push('/signin')}>
+              Go to Sign In
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

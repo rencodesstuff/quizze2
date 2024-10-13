@@ -20,9 +20,9 @@ interface SidebarProps {
 const sidebarItems = [
   { name: "Dashboard", href: "/studentdash", icon: HomeIcon },
   { name: "Student Quiz", href: "/stdquiz", icon: ClipboardCheckIcon },
-  { name: "Student Inbox", href: "/stdinbox", icon: InboxIcon },
   { name: "Student Profile", href: "/studentprofile", icon: UserIcon },
   { name: "Student Settings", href: "/stdsettings", icon: CogIcon },
+  { name: "Quiz History", href: "/stdinbox", icon: InboxIcon },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({

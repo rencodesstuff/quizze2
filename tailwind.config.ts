@@ -32,8 +32,15 @@ const config: Config = {
       },
       colors: {
         blue: {
+          50: '#EBF5FF',
           100: '#E6F0FD',
           600: '#2563EB',
+          700: '#1D4ED8',
+        },
+        indigo: {
+          100: '#E0E7FF',
+          600: '#4F46E5',
+          700: '#4338CA',
         },
       },
     },

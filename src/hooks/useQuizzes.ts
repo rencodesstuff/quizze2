@@ -76,6 +76,10 @@ export const useQuizzes = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user found');
 
+      // Set the current quiz code
+      await supabase.rpc('set_current_quiz_code', { quiz_code: quizCode });
+
+      // Query the quizzes table with the set quiz code
       const { data: quizData, error: quizError } = await supabase
         .from('quizzes')
         .select('*')
@@ -85,15 +89,21 @@ export const useQuizzes = () => {
       if (quizError) throw quizError;
       if (!quizData) throw new Error('Invalid quiz code');
 
+      // Join the quiz
       const { error: joinError } = await supabase
         .from('student_quizzes')
         .insert({ student_id: user.id, quiz_id: quizData.id });
 
       if (joinError) throw joinError;
 
+      // Clear the current quiz code setting
+      await supabase.rpc('clear_current_quiz_code');
+
       // Refresh quizzes after joining
       await fetchQuizzes();
     } catch (error) {
+      // Clear the current quiz code setting in case of error
+      await supabase.rpc('clear_current_quiz_code');
       console.error('Error joining quiz:', error);
       throw error;
     }

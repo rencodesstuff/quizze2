@@ -74,7 +74,7 @@ const MyQuizzes = () => {
       <div className="bg-white shadow-md rounded-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-800">My Quizzes</h1>
-          <Link href="/teachquiz/createquiz" passHref>
+          <Link href="/createquiz" passHref>
             <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-300">
               Create New Quiz
             </button>
