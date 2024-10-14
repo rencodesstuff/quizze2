@@ -1,17 +1,24 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Card, Title, Text, DonutChart, Flex, Select, SelectItem, Badge, Grid } from "@tremor/react";
+import { Card, Title, Text, DonutChart, Flex, Select, SelectItem, Badge, Grid, Button } from "@tremor/react";
 import { ClockIcon, AcademicCapIcon, SortAscendingIcon, ChartPieIcon, BookOpenIcon } from "@heroicons/react/outline";
 import StudentLayout from "@/comps/student-layout";
 import { createClient } from "../../../utils/supabase/component";
+import { useRouter } from 'next/router';
 
 type QuizResult = {
-  id: number;
-  title: string;
+  id: string;
+  student_id: string;
+  quiz_id: string;
+  submitted_at: string;
   score: number;
-  totalQuestions: number;
-  date: string;
-  duration: number;
+  total_questions: number;
+  correct_answers: number;
+  quiz: {
+    id: string;
+    title: string;
+    duration_minutes: number;
+  };
 };
 
 const StudentQuizHistory: React.FC = () => {
@@ -20,6 +27,7 @@ const StudentQuizHistory: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   const [sortBy, setSortBy] = useState("date");
+  const router = useRouter();
 
   const supabase = createClient();
 
@@ -55,42 +63,67 @@ const StudentQuizHistory: React.FC = () => {
   }, []);
 
   const fetchQuizResults = async (userId: string) => {
-    // Placeholder data
-    const mockResults: QuizResult[] = [
-      { id: 1, title: "Math Quiz 1", score: 85, totalQuestions: 20, date: "2024-07-15", duration: 30 },
-      { id: 2, title: "Science Quiz", score: 92, totalQuestions: 25, date: "2024-07-10", duration: 45 },
-      { id: 3, title: "History Test", score: 78, totalQuestions: 30, date: "2024-07-05", duration: 60 },
-      { id: 4, title: "English Essay", score: 88, totalQuestions: 1, date: "2024-07-01", duration: 90 },
-      { id: 5, title: "Geography Quiz", score: 95, totalQuestions: 15, date: "2024-06-28", duration: 25 },
-      // Add more mock results to simulate a longer list
-      ...[...Array(10)].map((_, i) => ({
-        id: i + 6,
-        title: `Additional Quiz ${i + 1}`,
-        score: Math.floor(Math.random() * 100),
-        totalQuestions: Math.floor(Math.random() * 30) + 10,
-        date: new Date(2024, 6, 27 - i).toISOString().split('T')[0],
-        duration: Math.floor(Math.random() * 60) + 15
-      }))
-    ];
-    setQuizResults(mockResults);
+    const { data, error } = await supabase
+      .from('quiz_submissions')
+      .select(`
+        id,
+        student_id,
+        quiz_id,
+        submitted_at,
+        score,
+        total_questions,
+        correct_answers,
+        quiz:quizzes (
+          id,
+          title,
+          duration_minutes
+        )
+      `)
+      .eq('student_id', userId)
+      .order('submitted_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching quiz results:', error);
+      return;
+    }
+
+    console.log('Raw data from Supabase:', JSON.stringify(data, null, 2));
+
+    const formattedResults: QuizResult[] = data.map((item: any) => ({
+      ...item,
+      quiz: Array.isArray(item.quiz) ? item.quiz[0] : item.quiz
+    }));
+
+    setQuizResults(formattedResults);
   };
 
   const sortedResults = [...quizResults].sort((a, b) => {
-    if (sortBy === "score") return (b.score / b.totalQuestions) - (a.score / a.totalQuestions);
-    if (sortBy === "date") return new Date(b.date).getTime() - new Date(a.date).getTime();
+    if (sortBy === "score") return b.score - a.score;
+    if (sortBy === "date") return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
     return 0;
   });
 
-  const getScoreColor = (score: number, totalQuestions: number) => {
-    const percentage = (score / totalQuestions) * 100;
-    if (percentage >= 90) return "bg-green-500 text-white";
-    if (percentage >= 70) return "bg-yellow-500 text-black";
+  const getScoreColor = (score: number) => {
+    if (score >= 90) return "bg-green-500 text-white";
+    if (score >= 70) return "bg-yellow-500 text-black";
     return "bg-red-500 text-white";
   };
 
   const calculateAverageScore = () => {
-    const totalScore = quizResults.reduce((sum, quiz) => sum + (quiz.score / quiz.totalQuestions), 0);
-    return (totalScore / quizResults.length) * 100;
+    if (quizResults.length === 0) return 0;
+    const totalScore = quizResults.reduce((sum, quiz) => sum + quiz.score, 0);
+    return totalScore / quizResults.length;
+  };
+
+  const getPerformanceOverviewData = () => {
+    return quizResults.map(result => ({
+      name: result.quiz.title,
+      score: result.score
+    }));
+  };
+
+  const handleViewDetails = (quizId: string) => {
+    router.push(`/stdinbox/${quizId}`);
   };
 
   if (loading) {
@@ -113,10 +146,7 @@ const StudentQuizHistory: React.FC = () => {
             </Flex>
             <DonutChart
               className="h-48"
-              data={sortedResults.map(result => ({
-                name: result.title,
-                score: (result.score / result.totalQuestions) * 100
-              }))}
+              data={getPerformanceOverviewData()}
               category="score"
               index="name"
               valueFormatter={(number) => `${number.toFixed(1)}%`}
@@ -155,33 +185,35 @@ const StudentQuizHistory: React.FC = () => {
               <motion.div
                 key={result.id}
                 initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.1 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
               >
                 <Card className="hover:shadow-lg transition-shadow duration-200">
-                  <Flex justifyContent="between" alignItems="start">
+                  <Flex justifyContent="between" alignItems="center">
                     <div>
-                      <Title className="text-lg font-semibold mb-2">{result.title}</Title>
+                      <Title className="text-lg font-semibold mb-2">{result.quiz.title}</Title>
                       <Badge 
                         size="xl"
-                        className={`${getScoreColor(result.score, result.totalQuestions)} px-3 py-1 rounded-full mb-2`}
+                        className={`${getScoreColor(result.score)} px-3 py-1 rounded-full mb-2`}
                       >
-                        Score: {result.score}/{result.totalQuestions}
+                        Score: {result.score.toFixed(2)}/100 points
                       </Badge>
                     </div>
-                    <Text className="text-right text-sm text-gray-500 font-medium">
-                      {new Date(result.date).toLocaleDateString()}
-                    </Text>
+                    <Button onClick={() => handleViewDetails(result.quiz_id)}>
+                      View Details
+                    </Button>
                   </Flex>
                   <Flex justifyContent="start" alignItems="center" className="mt-2">
                     <Text className="text-sm text-gray-600 mr-4">
                       <ClockIcon className="inline-block h-4 w-4 mr-1" />
-                      {result.duration} mins
+                      {result.quiz.duration_minutes} mins
+                    </Text>
+                    <Text className="text-sm text-gray-600 mr-4">
+                      <AcademicCapIcon className="inline-block h-4 w-4 mr-1" />
+                      {result.total_questions} questions
                     </Text>
                     <Text className="text-sm text-gray-600">
-                      <AcademicCapIcon className="inline-block h-4 w-4 mr-1" />
-                      {result.totalQuestions} questions
+                      {new Date(result.submitted_at).toLocaleDateString()}
                     </Text>
                   </Flex>
                 </Card>
