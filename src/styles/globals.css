@@ -17,3 +17,7 @@ body {
     transform: translateX(100%);
   }
 }
+
+.blur-sm {
+  filter: blur(4px);
+}

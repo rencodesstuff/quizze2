@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Card, Title, Text, DonutChart, Flex, Select, SelectItem, Badge, Grid, Button } from "@tremor/react";
+import { Card, Title, Text, Flex, Select, SelectItem, Badge, Grid, Button } from "@tremor/react";
 import { ClockIcon, AcademicCapIcon, SortAscendingIcon, ChartPieIcon, BookOpenIcon } from "@heroicons/react/outline";
 import StudentLayout from "@/comps/student-layout";
 import { createClient } from "../../../utils/supabase/component";
 import { useRouter } from 'next/router';
+import { Chart } from "react-google-charts";
 
 type QuizResult = {
   id: string;
@@ -87,8 +88,6 @@ const StudentQuizHistory: React.FC = () => {
       return;
     }
 
-    console.log('Raw data from Supabase:', JSON.stringify(data, null, 2));
-
     const formattedResults: QuizResult[] = data.map((item: any) => ({
       ...item,
       quiz: Array.isArray(item.quiz) ? item.quiz[0] : item.quiz
@@ -116,14 +115,59 @@ const StudentQuizHistory: React.FC = () => {
   };
 
   const getPerformanceOverviewData = () => {
-    return quizResults.map(result => ({
-      name: result.quiz.title,
-      score: result.score
-    }));
+    return [
+      ["Quiz", "Score"],
+      ...quizResults.map(result => [result.quiz.title, result.score])
+    ];
+  };
+
+  const getAverageScoreData = () => {
+    const averageScore = calculateAverageScore();
+    return [
+      ["Category", "Percentage"],
+      ["Average Score", averageScore],
+      ["Remaining", 100 - averageScore]
+    ];
   };
 
   const handleViewDetails = (quizId: string) => {
     router.push(`/stdinbox/${quizId}`);
+  };
+
+  const performanceChartOptions = {
+    title: "Performance Overview",
+    pieHole: 0.4,
+    is3D: true,
+    pieStartAngle: 100,
+    sliceVisibilityThreshold: 0.02,
+    legend: {
+      position: "bottom",
+      alignment: "center",
+      textStyle: {
+        color: "#233238",
+        fontSize: 14,
+      },
+    },
+    colors: ["#8AD1C2", "#9F8AD1", "#D18A99", "#BCD18A", "#D1C28A", "#D1AA8A", "#8AA2D1", "#D18AB4", "#8AD1B4", "#D1CF8A"],
+  };
+
+  const averageScoreChartOptions = {
+    title: "Average Score",
+    pieHole: 0.4,
+    is3D: false,
+    pieStartAngle: 100,
+    slices: {
+      0: { color: "#4CAF50" },
+      1: { color: "#E0E0E0" }
+    },
+    legend: {
+      position: "bottom",
+      alignment: "center",
+      textStyle: {
+        color: "#233238",
+        fontSize: 14,
+      },
+    },
   };
 
   if (loading) {
@@ -144,13 +188,12 @@ const StudentQuizHistory: React.FC = () => {
               <ChartPieIcon className="h-6 w-6 text-blue-500 mr-2" />
               <Title className="text-lg font-semibold">Performance Overview</Title>
             </Flex>
-            <DonutChart
-              className="h-48"
+            <Chart
+              chartType="PieChart"
               data={getPerformanceOverviewData()}
-              category="score"
-              index="name"
-              valueFormatter={(number) => `${number.toFixed(1)}%`}
-              colors={["slate", "violet", "indigo", "rose", "cyan", "amber"]}
+              options={performanceChartOptions}
+              width={"100%"}
+              height={"300px"}
             />
           </Card>
           <Card>
@@ -158,16 +201,12 @@ const StudentQuizHistory: React.FC = () => {
               <BookOpenIcon className="h-6 w-6 text-green-500 mr-2" />
               <Title className="text-lg font-semibold">Average Score</Title>
             </Flex>
-            <DonutChart
-              className="h-48"
-              data={[
-                { name: "Average Score", score: calculateAverageScore() },
-                { name: "Remaining", score: 100 - calculateAverageScore() }
-              ]}
-              category="score"
-              index="name"
-              valueFormatter={(number) => `${number.toFixed(1)}%`}
-              colors={["green", "gray"]}
+            <Chart
+              chartType="PieChart"
+              data={getAverageScoreData()}
+              options={averageScoreChartOptions}
+              width={"100%"}
+              height={"300px"}
             />
           </Card>
         </div>

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { createClient } from "../../../utils/supabase/component";
-import { MultiStepLoader } from "@/ui/multi-step-loader";
 import { MultipleChoice, TrueFalse, ShortAnswer } from '@/comps/QuestionTypes';
+import ErrorModal from "@/comps/ErrorModal";
 
 interface Question {
   id: string;
@@ -35,11 +35,15 @@ const TakeQuiz: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
     const fetchQuizAndStudentInfo = async () => {
-      if (typeof id !== "string") return;
+      if (typeof id !== "string") {
+        setErrorMessage("Invalid quiz ID. Please try again.");
+        return;
+      }
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("No authenticated user found");
@@ -52,7 +56,8 @@ const TakeQuiz: React.FC = () => {
           `).eq("id", id).single()
         ]);
   
-        if (studentData.error || quizData.error) throw new Error("Error fetching data");
+        if (studentData.error) throw new Error("Error fetching student data");
+        if (quizData.error) throw new Error("Error fetching quiz data");
   
         setStudentInfo({ name: studentData.data.name, id: studentData.data.student_id });
         setQuiz({
@@ -64,7 +69,7 @@ const TakeQuiz: React.FC = () => {
         });
         setTimeLeft(quizData.data.duration_minutes * 60);
       } catch (error) {
-        console.error("Error fetching quiz or student info:", error);
+        setErrorMessage(`An error occurred while loading the quiz: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     };
   
@@ -89,7 +94,10 @@ const TakeQuiz: React.FC = () => {
   };
 
   const handleSubmitQuiz = async () => {
-    if (!quiz || typeof id !== "string") return;
+    if (!quiz || typeof id !== "string") {
+      setErrorMessage("Unable to submit quiz. Please try again.");
+      return;
+    }
     setIsSubmitting(true);
     setSubmitError(null);
 
@@ -113,8 +121,7 @@ const TakeQuiz: React.FC = () => {
       setQuizSubmitted(true);
       router.push(`/stdinbox`);
     } catch (error) {
-      console.error("Error submitting quiz:", error);
-      setSubmitError("Failed to submit quiz. Please try again.");
+      setSubmitError(`Failed to submit quiz: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -127,8 +134,8 @@ const TakeQuiz: React.FC = () => {
         if (question.options && Array.isArray(question.options)) {
           return <MultipleChoice {...props} />;
         } else {
-          console.error("Invalid options for multiple choice question:", question.options);
-          return <p>Error: Invalid question options</p>;
+          setErrorMessage(`Invalid options for question ${currentQuestionIndex + 1}. Please contact support.`);
+          return null;
         }
       case "true_false":
       case "true_or_false":
@@ -136,9 +143,14 @@ const TakeQuiz: React.FC = () => {
       case "short_answer":
         return <ShortAnswer {...props} />;
       default:
-        return <p>Unsupported question type: {question.type}</p>;
+        setErrorMessage(`Unsupported question type for question ${currentQuestionIndex + 1}. Please contact support.`);
+        return null;
     }
   };
+
+  if (errorMessage) {
+    return <ErrorModal message={errorMessage} onClose={() => router.push('/stdinbox')} />;
+  }
 
   if (!quiz) return <div className="h-screen flex items-center justify-center">Loading quiz...</div>;
 
@@ -179,8 +191,10 @@ const TakeQuiz: React.FC = () => {
         </div>
 
         <motion.div
+          key={currentQuestionIndex}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.5 }}
           className="flex-grow bg-white shadow-xl rounded-lg p-8"
         >
@@ -225,37 +239,49 @@ const TakeQuiz: React.FC = () => {
         </motion.div>
       </main>
 
-      {showConfirmation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-8 rounded-lg max-w-2xl w-full">
-            <h2 className="text-2xl font-bold mb-4">Review Your Answers</h2>
-            {quiz.questions.map((question, index) => (
-              <div key={question.id} className="mb-4">
-                <p className="font-semibold">Question {index + 1}: {question.text}</p>
-                <p className={answers[question.id] ? "text-blue-600" : "text-yellow-600"}>
-                  {answers[question.id] ? `Your answer: ${answers[question.id]}` : "Skipped"}
-                </p>
+      <AnimatePresence>
+        {showConfirmation && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="bg-white p-8 rounded-lg max-w-2xl w-full"
+            >
+              <h2 className="text-2xl font-bold mb-4">Review Your Answers</h2>
+              {quiz.questions.map((question, index) => (
+                <div key={question.id} className="mb-4">
+                  <p className="font-semibold">Question {index + 1}: {question.text}</p>
+                  <p className={answers[question.id] ? "text-blue-600" : "text-yellow-600"}>
+                    {answers[question.id] ? `Your answer: ${answers[question.id]}` : "Skipped"}
+                  </p>
+                </div>
+              ))}
+              <div className="flex justify-between mt-6">
+                <button
+                  onClick={() => setShowConfirmation(false)}
+                  className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition duration-150"
+                >
+                  Go Back
+                </button>
+                <button
+                  onClick={handleSubmitQuiz}
+                  disabled={isSubmitting}
+                  className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150 disabled:opacity-50"
+                >
+                  {isSubmitting ? "Submitting..." : "Confirm Submission"}
+                </button>
               </div>
-            ))}
-            <div className="flex justify-between mt-6">
-              <button
-                onClick={() => setShowConfirmation(false)}
-                className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition duration-150"
-              >
-                Go Back
-              </button>
-              <button
-                onClick={handleSubmitQuiz}
-                disabled={isSubmitting}
-                className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150 disabled:opacity-50"
-              >
-                {isSubmitting ? "Submitting..." : "Confirm Submission"}
-              </button>
-            </div>
-            {submitError && <p className="mt-4 text-red-500 text-center">{submitError}</p>}
-          </div>
-        </div>
-      )}
+              {submitError && <p className="mt-4 text-red-500 text-center">{submitError}</p>}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
