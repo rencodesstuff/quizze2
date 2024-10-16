@@ -43,7 +43,10 @@ const TeacherQuizScores: React.FC = () => {
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        if (data) setQuizzes(data);
+        if (data) {
+          console.log("Fetched quizzes:", data);
+          setQuizzes(data);
+        }
       }
     } catch (error) {
       console.error('Error fetching quizzes:', error);
@@ -51,41 +54,38 @@ const TeacherQuizScores: React.FC = () => {
       setIsLoading(false);
     }
   };
-
+  
   const fetchStudentSubmissions = async (quizId: string) => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('quiz_submissions')
         .select(`
+          id,
           score,
           submitted_at,
-          students (name),
-          quiz_id,
-          answers
+          total_questions,
+          correct_answers,
+          answers,
+          students (id, name, student_id)
         `)
         .eq('quiz_id', quizId);
-
+  
       if (error) throw error;
-
-      // Fetch total number of questions for the quiz
-      const { data: questionsData, error: questionsError } = await supabase
-        .from('questions')
-        .select('id')
-        .eq('quiz_id', quizId);
-
-      if (questionsError) throw questionsError;
-
-      const totalQuestions = questionsData.length;
-
+  
+      console.log("Raw fetched submissions:", data);
+  
       if (data) {
         const submissions: StudentSubmission[] = data.map((submission: any) => ({
-          student_name: submission.students[0]?.name || 'Unknown',
+          student_name: submission.students?.name || 'Unknown',
+          student_id: submission.students?.student_id || 'N/A',
           score: submission.score,
           submitted_at: submission.submitted_at,
-          total_questions: totalQuestions,
+          total_questions: submission.total_questions,
           answered_questions: Object.keys(submission.answers).length
         }));
+  
+        console.log("Processed submissions:", submissions);
         setStudentSubmissions(submissions);
       }
     } catch (error) {

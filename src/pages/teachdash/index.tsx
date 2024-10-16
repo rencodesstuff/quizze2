@@ -1,25 +1,119 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import TeacherLayout from "@/comps/teacher-layout";
 import { Tab } from '@headlessui/react';
-import { FaClipboardList, FaUserGraduate, FaBell, FaCalendarAlt } from 'react-icons/fa';
-import { createClient } from "../../../utils/supabase/server-props";
+import { FaClipboardList, FaUserGraduate } from 'react-icons/fa';
+import { createClient } from "../../../utils/supabase/component";
 
 interface TeacherDashboardProps {
-  user: any;
-  teacherName: string;
+  user?: {
+    id: string;
+  };
 }
 
-const TeacherDashboard: React.FC = () => {
+const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user }) => {
+  const [teacherName, setTeacherName] = useState("");
+  const [activeQuizzes, setActiveQuizzes] = useState(0);
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchTeacherData = async () => {
+      if (!user?.id) {
+        const supabase = createClient();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError || !session) {
+          setError("User not authenticated");
+          setLoading(false);
+          return;
+        }
+
+        user = { id: session.user.id };
+      }
+
+      const supabase = createClient();
+      
+      try {
+        // Check if the user is a teacher
+        const { data: teacherData, error: teacherError } = await supabase
+          .from('teachers')
+          .select('name')
+          .eq('id', user.id)
+          .single();
+
+        if (teacherError || !teacherData) {
+          setError("User is not authorized as a teacher");
+          setLoading(false);
+          return;
+        }
+
+        setTeacherName(teacherData.name);
+
+        // Fetch active quizzes count (including those without a release date)
+        const { count: quizCount, error: quizError } = await supabase
+          .from('quizzes')
+          .select('id', { count: 'exact' })
+          .eq('teacher_id', user.id)
+          .or('release_date.is.null,release_date.lte.now()');
+
+        if (quizError) throw new Error('Error fetching quiz count');
+        setActiveQuizzes(quizCount || 0);
+
+        // Fetch quiz IDs for this teacher
+        const { data: quizIds, error: quizIdsError } = await supabase
+          .from('quizzes')
+          .select('id')
+          .eq('teacher_id', user.id);
+
+        if (quizIdsError) throw new Error('Error fetching quiz IDs');
+
+        // Fetch total unique students count based on quiz submissions
+        if (quizIds && quizIds.length > 0) {
+          const { count: studentCount, error: studentError } = await supabase
+            .from('quiz_submissions')
+            .select('student_id', { count: 'exact', head: true })
+            .in('quiz_id', quizIds.map(q => q.id));
+
+          if (studentError) throw new Error('Error fetching student count');
+          setTotalStudents(studentCount || 0);
+        } else {
+          setTotalStudents(0);
+        }
+
+      } catch (err) {
+        console.error('Error:', err);
+        setError('An error occurred while fetching data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTeacherData();
+  }, [user?.id]);
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-screen">
+      <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900"></div>
+    </div>;
+  }
+
+  if (error) {
+    return <div className="flex justify-center items-center h-screen">
+      <div className="text-red-500 text-xl">{error}</div>
+    </div>;
+  }
+
   return (
     <TeacherLayout>
       <div className="bg-white p-6 rounded-lg shadow-md overflow-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
           <div className="mb-4 md:mb-0">
             <h2 className="text-2xl font-semibold mb-2">
-              Welcome back, Dr. Smith!
+              Welcome back, {teacherName}!
             </h2>
             <p className="text-gray-600">
-              Here&apos;s what&apos;s happening in your classes today.
+              Here's what's happening in your classes today.
             </p>
           </div>
           <button className="px-4 py-2 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition">
@@ -27,12 +121,10 @@ const TeacherDashboard: React.FC = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           {[
-            { title: "Active Quizzes", value: "5", color: "bg-blue-100 text-blue-800", icon: <FaClipboardList /> },
-            { title: "Total Students", value: "150", color: "bg-green-100 text-green-800", icon: <FaUserGraduate /> },
-            { title: "Pending Grading", value: "23", color: "bg-yellow-100 text-yellow-800", icon: <FaBell /> },
-            { title: "Upcoming Events", value: "3", color: "bg-purple-100 text-purple-800", icon: <FaCalendarAlt /> },
+            { title: "Active Quizzes", value: activeQuizzes.toString(), color: "bg-blue-100 text-blue-800", icon: <FaClipboardList /> },
+            { title: "Total Students", value: totalStudents.toString(), color: "bg-green-100 text-green-800", icon: <FaUserGraduate /> },
           ].map((stat, index) => (
             <div key={index} className={`${stat.color} rounded-lg p-6 flex items-center`}>
               <div className="text-3xl mr-4">{stat.icon}</div>

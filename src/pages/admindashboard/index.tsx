@@ -30,16 +30,75 @@ interface DashboardStats {
   completedQuizzes: number;
 }
 
-const AdminDashboard = () => {
+interface RecentActivity {
+  action: string;
+  subject: string;
+  time: string;
+}
+
+interface TopPerformingQuiz {
+  name: string;
+  completions: number;
+  avgScore: number;
+}
+
+interface RecentUser {
+  name: string;
+  email: string;
+  role: string;
+}
+
+interface RecentQuiz {
+  name: string;
+  creator: string;
+  status: string;
+}
+
+interface QuizSubmission {
+  quiz_id: string;
+  quizzes: {
+    title: string;
+  };
+  score: number;
+}
+
+interface QuizData {
+  title: string;
+  teachers: {
+    name: string;
+  } | null;
+  status: string;
+}
+
+const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     totalQuizzes: 0,
     activeTeachers: 0,
     completedQuizzes: 0
   });
+  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
+  const [topQuizzes, setTopQuizzes] = useState<TopPerformingQuiz[]>([]);
+  const [dailyActiveUsers, setDailyActiveUsers] = useState(0);
+  const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
+  const [recentQuizzes, setRecentQuizzes] = useState<RecentQuiz[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const supabase = createClient();
+
+  const formatRelativeTime = (date: string) => {
+    const now = new Date();
+    const past = new Date(date);
+    const diffTime = Math.abs(now.getTime() - past.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+    return `${Math.floor(diffDays / 365)} years ago`;
+  };
 
   const fetchDashboardStats = async () => {
     setIsLoading(true);
@@ -90,6 +149,139 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchRecentActivities = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_activities')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+
+      const activities: RecentActivity[] = data.map(activity => ({
+        action: activity.action,
+        subject: activity.subject,
+        time: formatRelativeTime(activity.created_at)
+      }));
+
+      setRecentActivities(activities);
+    } catch (error) {
+      console.error('Error fetching recent activities:', error);
+    }
+  };
+
+  const fetchTopPerformingQuizzes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('quiz_submissions')
+        .select(`
+          quiz_id,
+          quizzes (title),
+          score
+        `)
+        .order('score', { ascending: false })
+        .limit(30);
+  
+      if (error) throw error;
+  
+      const quizzes: TopPerformingQuiz[] = (data as unknown as QuizSubmission[]).reduce((acc, submission) => {
+        const quizTitle = submission.quizzes.title;
+        const existingQuiz = acc.find(q => q.name === quizTitle);
+        if (existingQuiz) {
+          existingQuiz.completions++;
+          existingQuiz.avgScore = (existingQuiz.avgScore * (existingQuiz.completions - 1) + submission.score) / existingQuiz.completions;
+        } else {
+          acc.push({
+            name: quizTitle,
+            completions: 1,
+            avgScore: submission.score
+          });
+        }
+        return acc;
+      }, [] as TopPerformingQuiz[]);
+  
+      setTopQuizzes(quizzes.slice(0, 3));
+    } catch (error) {
+      console.error('Error fetching top performing quizzes:', error);
+    }
+  };
+
+  const fetchDailyActiveUsers = async () => {
+    try {
+      const yesterday = new Date(new Date().setDate(new Date().getDate() - 1)).toISOString();
+      const { count, error } = await supabase
+        .from('user_activities')
+        .select('user_id', { count: 'exact', head: true })
+        .gte('created_at', yesterday)
+        .limit(1);
+
+      if (error) throw error;
+
+      setDailyActiveUsers(count || 0);
+    } catch (error) {
+      console.error('Error fetching daily active users:', error);
+    }
+  };
+
+  const fetchRecentUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('id, role, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+
+      const usersData = await Promise.all(data.map(async (user) => {
+        const { data: userData, error: userError } = await supabase
+          .from(user.role === 'student' ? 'students' : 'teachers')
+          .select('name, email')
+          .eq('id', user.id)
+          .single();
+
+        if (userError) throw userError;
+
+        return {
+          name: userData.name,
+          email: userData.email,
+          role: user.role
+        };
+      }));
+
+      setRecentUsers(usersData);
+    } catch (error) {
+      console.error('Error fetching recent users:', error);
+    }
+  };
+
+  const fetchRecentQuizzes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('quizzes')
+        .select(`
+          title,
+          teachers (name),
+          status
+        `)
+        .order('created_at', { ascending: false })
+        .limit(5);
+  
+      if (error) throw error;
+  
+      const quizzes: RecentQuiz[] = (data as unknown as QuizData[]).map(quiz => ({
+        name: quiz.title,
+        creator: quiz.teachers?.name || 'Unknown',
+        status: quiz.status
+      }));
+  
+      setRecentQuizzes(quizzes);
+    } catch (error) {
+      console.error('Error fetching recent quizzes:', error);
+    }
+  };
+
   useEffect(() => {
     const checkAdminStatus = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -105,6 +297,11 @@ const AdminDashboard = () => {
           // Handle non-admin user (e.g., redirect to login page)
         } else {
           fetchDashboardStats();
+          fetchRecentActivities();
+          fetchTopPerformingQuizzes();
+          fetchDailyActiveUsers();
+          fetchRecentUsers();
+          fetchRecentQuizzes();
         }
       } else {
         console.error('No user authenticated');
@@ -162,11 +359,7 @@ const AdminDashboard = () => {
           <Card>
             <Title className="text-gray-900">Recent Activity</Title>
             <List className="mt-4">
-              {[
-                { action: "New user registered", subject: "John Doe", time: "2 hours ago" },
-                { action: "Quiz created", subject: "Advanced Mathematics", time: "5 hours ago" },
-                { action: "Course updated", subject: "Introduction to AI", time: "1 day ago" },
-              ].map((activity, index) => (
+              {recentActivities.map((activity, index) => (
                 <ListItem key={index}>
                   <Flex justifyContent="start" className="truncate space-x-4">
                     <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
@@ -195,17 +388,13 @@ const AdminDashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {[
-                  { name: "Web Development Basics", completions: 789, avgScore: 85 },
-                  { name: "Data Structures", completions: 654, avgScore: 78 },
-                  { name: "Machine Learning Concepts", completions: 542, avgScore: 92 },
-                ].map((item) => (
-                  <TableRow key={item.name}>
-                    <TableCell className="text-gray-900">{item.name}</TableCell>
-                    <TableCell className="text-right text-gray-700">{item.completions}</TableCell>
+                {topQuizzes.map((quiz) => (
+                  <TableRow key={quiz.name}>
+                    <TableCell className="text-gray-900">{quiz.name}</TableCell>
+                    <TableCell className="text-right text-gray-700">{quiz.completions}</TableCell>
                     <TableCell className="text-right">
                       <Badge color="green" className="text-white font-medium">
-                        {item.avgScore}%
+                        {quiz.avgScore.toFixed(2)}%
                       </Badge>
                     </TableCell>
                   </TableRow>
@@ -220,16 +409,16 @@ const AdminDashboard = () => {
           <Title className="text-gray-900">User Engagement</Title>
           <Flex className="mt-4">
             <Text className="text-gray-700">
-              <Bold>Daily Active Users:</Bold> 2,546
+              <Bold>Daily Active Users:</Bold> {dailyActiveUsers}
             </Text>
           </Flex>
-          <ProgressBar value={45} className="mt-2" />
+          <ProgressBar value={dailyActiveUsers / stats.totalUsers * 100} className="mt-2" />
         </Card>
 
         {/* Recent Users and Quizzes */}
         <Card>
           <Tab.Group>
-            <Tab.List className="flex space-x-4 border-b">
+          <Tab.List className="flex space-x-4 border-b">
               <Tab className={({ selected }) =>
                 `py-2 px-4 font-medium focus:outline-none ${
                   selected ? 'text-red-600 border-b-2 border-red-600' : 'text-gray-700 hover:text-gray-900'
@@ -256,16 +445,12 @@ const AdminDashboard = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {[
-                      { name: "Alice Johnson", email: "alice@example.com", role: "Student" },
-                      { name: "Bob Smith", email: "bob@example.com", role: "Teacher" },
-                      { name: "Charlie Brown", email: "charlie@example.com", role: "Student" },
-                    ].map((user) => (
-                      <TableRow key={user.name}>
+                    {recentUsers.map((user) => (
+                      <TableRow key={user.email}>
                         <TableCell className="text-gray-900">{user.name}</TableCell>
                         <TableCell className="text-gray-700">{user.email}</TableCell>
                         <TableCell>
-                          <Badge color={user.role === 'Student' ? 'blue' : 'green'} className="text-white font-medium">
+                          <Badge color={user.role === 'student' ? 'blue' : 'green'} className="text-white font-medium">
                             {user.role}
                           </Badge>
                         </TableCell>
@@ -284,16 +469,12 @@ const AdminDashboard = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {[
-                      { name: "JavaScript Fundamentals", creator: "Dr. Smith", status: "Active" },
-                      { name: "Python for Beginners", creator: "Prof. Johnson", status: "Draft" },
-                      { name: "Advanced Database Concepts", creator: "Dr. Davis", status: "Active" },
-                    ].map((quiz) => (
+                    {recentQuizzes.map((quiz) => (
                       <TableRow key={quiz.name}>
                         <TableCell className="text-gray-900">{quiz.name}</TableCell>
                         <TableCell className="text-gray-700">{quiz.creator}</TableCell>
                         <TableCell>
-                          <Badge color={quiz.status === 'Active' ? 'green' : 'yellow'} className="text-white font-medium">
+                          <Badge color={quiz.status === 'active' ? 'green' : 'yellow'} className="text-white font-medium">
                             {quiz.status}
                           </Badge>
                         </TableCell>
