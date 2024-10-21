@@ -50,7 +50,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user }) => {
 
         setTeacherName(teacherData.name);
 
-        // Fetch active quizzes count (including those without a release date)
+        // Fetch active quizzes count for this teacher
         const { count: quizCount, error: quizError } = await supabase
           .from('quizzes')
           .select('id', { count: 'exact' })

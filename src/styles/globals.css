@@ -21,3 +21,27 @@ body {
 .blur-sm {
   filter: blur(4px);
 }
+
+/* Remove default focus outlines */
+*:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Add custom focus styles for accessibility */
+*:focus-visible {
+  outline: 2px solid #4299e1 !important; /* Tailwind blue-500 color */
+  outline-offset: 2px;
+}
+
+/* Override Tremor focus styles */
+.tremor-base:focus, .tremor-base[data-focus] {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove blue border from Tremor cards */
+.tremor-Card-root {
+  border: none !important;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
+}

@@ -32,7 +32,7 @@ const quizzes: Quiz[] = [
   {
     title: "Web Development Basics",
     description: "Test your knowledge of HTML, CSS, and JavaScript fundamentals",
-    icon: "/web-dev-icon.png",
+    icon: "/web.jpg",
     questions: 20,
     duration: "30 minutes",
     difficulty: "Beginner",
@@ -41,7 +41,7 @@ const quizzes: Quiz[] = [
   {
     title: "Data Structures",
     description: "Challenge yourself with questions on arrays, linked lists, trees, and more",
-    icon: "/data-structures-icon.png",
+    icon: "/ds.jpg",
     questions: 25,
     duration: "45 minutes",
     difficulty: "Intermediate",
@@ -50,7 +50,7 @@ const quizzes: Quiz[] = [
   {
     title: "Machine Learning Concepts",
     description: "Explore your understanding of ML algorithms and techniques",
-    icon: "/ml-icon.png",
+    icon: "/20945347.jpg",
     questions: 30,
     duration: "60 minutes",
     difficulty: "Advanced",
@@ -204,9 +204,9 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     .eq('id', user.id)
     .single();
 
+  // Log any errors
   if (studentError) {
     console.error('Error fetching student data:', studentError);
-    // Handle error as appropriate for your application
   }
 
   return {

@@ -1,5 +1,3 @@
-// File: pages/teachquiz/index.tsx
-
 import React, { useState, useEffect } from "react";
 import TeacherLayout from "@/comps/teacher-layout";
 import Link from "next/link";
@@ -41,7 +39,7 @@ const MyQuizzes = () => {
       setQuizzes(data || []);
     } catch (error) {
       console.error('Error fetching quizzes:', error);
-      // You might want to show an error message to the user here
+      // Placeholder for error handling
     } finally {
       setLoading(false);
     }
@@ -60,7 +58,7 @@ const MyQuizzes = () => {
       setQuizzes(quizzes.filter(quiz => quiz.id !== quizId));
     } catch (error) {
       console.error('Error deleting quiz:', error);
-      // You might want to show an error message to the user here
+      // Placeholder for error handling
     }
   };
 

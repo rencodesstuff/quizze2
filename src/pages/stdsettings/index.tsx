@@ -50,7 +50,6 @@ const StudentSettings = () => {
         }
       } catch (err) {
         console.error('Error in fetchStudentInfo:', err);
-        // Handle error appropriately
       } finally {
         setLoading(false);
       }

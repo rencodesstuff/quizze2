@@ -18,10 +18,10 @@ interface AdminSidebarProps {
 }
 
 const sidebarItems = [
-  { name: "Dashboard", href: "/admindash", icon: HomeIcon },
-  { name: "User Management", href: "/admin/users", icon: UserGroupIcon },
+  { name: "Dashboard", href: "/admindashboard", icon: HomeIcon },
+  { name: "User Management", href: "/usermanagement", icon: UserGroupIcon },
   { name: "Quiz Management", href: "/admin/quizzes", icon: ClipboardListIcon },
-  { name: "Course Management", href: "/admin/courses", icon: AcademicCapIcon },
+  { name: "Add User", href: "/adduser", icon: AcademicCapIcon },
   { name: "Analytics", href: "/admin/analytics", icon: ChartBarIcon },
   { name: "Settings", href: "/admin/settings", icon: CogIcon },
 ];

@@ -163,27 +163,102 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="features" className="py-16 bg-blue-50">
-          <div className="container mx-auto text-center px-4">
-            <h3 className="text-4xl font-bold text-blue-600">Why Choose Quizze?</h3>
-            <p className="mt-6 text-xl text-gray-700">
-              Quizze offers a variety of topics, challenging questions, and an
-              interactive experience.
+        <section id="features" className="bg-gray-50 py-24 sm:py-32">
+  <div className="mx-auto max-w-2xl px-6 lg:max-w-7xl lg:px-8">
+    <h2 className="text-center text-base font-semibold text-blue-600">Why Choose Quizze?</h2>
+    <p className="mx-auto mt-2 max-w-lg text-center text-4xl font-medium tracking-tight text-gray-950 sm:text-5xl">
+      Everything you need for the ultimate quiz experience.
+    </p>
+    <div className="mt-10 grid gap-4 sm:mt-16 lg:grid-cols-3 lg:grid-rows-2">
+      <div className="relative lg:row-span-2">
+        <div className="absolute inset-px rounded-lg bg-white lg:rounded-l-[2rem]"></div>
+        <div className="relative flex h-full flex-col overflow-hidden rounded-[calc(theme(borderRadius.lg)+1px)] lg:rounded-l-[calc(2rem+1px)]">
+          <div className="px-8 pb-3 pt-8 sm:px-10 sm:pb-0 sm:pt-10">
+            <p className="mt-2 text-lg font-medium tracking-tight text-gray-950 max-lg:text-center">
+              Diverse Topics
             </p>
-            <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
-              {["Diverse Topics", "Challenging Questions", "Interactive Experience"].map((feature, index) => (
-                <div key={index} className="p-8 bg-white rounded-md shadow-md transform hover:scale-105 transition-transform duration-300">
-                  <h4 className="text-2xl font-semibold text-blue-600">{feature}</h4>
-                  <p className="mt-4 text-lg text-gray-700">
-                    {index === 0 && "Explore quizzes across various subjects."}
-                    {index === 1 && "Test your knowledge with tough questions."}
-                    {index === 2 && "Enjoy an engaging and interactive quiz experience."}
-                  </p>
-                </div>
-              ))}
+            <p className="mt-2 max-w-lg text-sm text-gray-600 max-lg:text-center">
+              Explore quizzes across various subjects, from science to history and everything in between.
+            </p>
+          </div>
+          <div className="relative min-h-[30rem] w-full grow [container-type:inline-size] max-lg:mx-auto max-lg:max-w-sm">
+            <div className="absolute inset-x-10 bottom-0 top-10 overflow-hidden rounded-t-[12cqw] border-x-[3cqw] border-t-[3cqw] border-gray-700 bg-gray-900 shadow-2xl">
+              <img
+                className="size-full object-cover object-top"
+                src="/topic.jpg"
+                alt="Diverse Topics"
+              />
             </div>
           </div>
-        </section>
+        </div>
+        <div className="pointer-events-none absolute inset-px rounded-lg shadow ring-1 ring-black/5 lg:rounded-l-[2rem]"></div>
+      </div>
+      <div className="relative max-lg:row-start-1">
+        <div className="absolute inset-px rounded-lg bg-white max-lg:rounded-t-[2rem]"></div>
+        <div className="relative flex h-full flex-col overflow-hidden rounded-[calc(theme(borderRadius.lg)+1px)] max-lg:rounded-t-[calc(2rem+1px)]">
+          <div className="px-8 pt-8 sm:px-10 sm:pt-10">
+            <p className="mt-2 text-lg font-medium tracking-tight text-gray-950 max-lg:text-center">
+              Challenging Questions
+            </p>
+            <p className="mt-2 max-w-lg text-sm text-gray-600 max-lg:text-center">
+              Test your knowledge with tough questions designed to push your limits.
+            </p>
+          </div>
+          <div className="flex flex-1 items-center justify-center px-8 max-lg:pb-12 max-lg:pt-10 sm:px-10 lg:pb-2">
+            <img
+              className="w-full max-lg:max-w-xs"
+              src="/questions.jpg"
+              alt="Challenging Questions"
+            />
+          </div>
+        </div>
+        <div className="pointer-events-none absolute inset-px rounded-lg shadow ring-1 ring-black/5 max-lg:rounded-t-[2rem]"></div>
+      </div>
+      <div className="relative max-lg:row-start-3 lg:col-start-2 lg:row-start-2">
+        <div className="absolute inset-px rounded-lg bg-white"></div>
+        <div className="relative flex h-full flex-col overflow-hidden rounded-[calc(theme(borderRadius.lg)+1px)]">
+          <div className="px-8 pt-8 sm:px-10 sm:pt-10">
+            <p className="mt-2 text-lg font-medium tracking-tight text-gray-950 max-lg:text-center">Interactive Experience</p>
+            <p className="mt-2 max-w-lg text-sm text-gray-600 max-lg:text-center">
+              Enjoy an engaging and interactive quiz experience that makes learning fun.
+            </p>
+          </div>
+          <div className="flex flex-1 items-center [container-type:inline-size] max-lg:py-6 lg:pb-2">
+            <img
+              className="h-[min(152px,40cqw)] object-cover object-center"
+              src="/interactive.jpg"
+              alt="Interactive Experience"
+            />
+          </div>
+        </div>
+        <div className="pointer-events-none absolute inset-px rounded-lg shadow ring-1 ring-black/5"></div>
+      </div>
+      <div className="relative lg:row-span-2">
+        <div className="absolute inset-px rounded-lg bg-white max-lg:rounded-b-[2rem] lg:rounded-r-[2rem]"></div>
+        <div className="relative flex h-full flex-col overflow-hidden rounded-[calc(theme(borderRadius.lg)+1px)] max-lg:rounded-b-[calc(2rem+1px)] lg:rounded-r-[calc(2rem+1px)]">
+          <div className="px-8 pb-3 pt-8 sm:px-10 sm:pb-0 sm:pt-10">
+            <p className="mt-2 text-lg font-medium tracking-tight text-gray-950 max-lg:text-center">
+              Performance Tracking
+            </p>
+            <p className="mt-2 max-w-lg text-sm text-gray-600 max-lg:text-center">
+              Track your progress and see how you improve over time with detailed performance analytics.
+            </p>
+          </div>
+          <div className="relative min-h-[30rem] w-full grow">
+            <div className="absolute bottom-0 left-10 right-0 top-10 overflow-hidden rounded-tl-xl bg-gray-900 shadow-2xl">
+              <img
+                className="size-full object-cover object-top"
+                src="/performance.jpg"
+                alt="Performance Tracking"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="pointer-events-none absolute inset-px rounded-lg shadow ring-1 ring-black/5 max-lg:rounded-b-[2rem] lg:rounded-r-[2rem]"></div>
+      </div>
+    </div>
+  </div>
+</section>
 
         <section id="team" className="py-12 bg-white">
           <div className="container mx-auto text-center px-4">
