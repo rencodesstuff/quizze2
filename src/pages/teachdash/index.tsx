@@ -113,7 +113,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user }) => {
               Welcome back, {teacherName}!
             </h2>
             <p className="text-gray-600">
-              Here's what's happening in your classes today.
+              Here&apos;s what&apos;s happening in your classes today.
             </p>
           </div>
           <button className="px-4 py-2 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition">
