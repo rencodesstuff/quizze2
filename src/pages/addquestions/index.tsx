@@ -1,3 +1,4 @@
+// index.tsx
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import TeacherLayout from "@/comps/teacher-layout";
@@ -14,6 +15,9 @@ interface Question {
   correct_answer: string;
   image_url?: string;
   explanation: string;
+  multiple_correct_answers?: string[];
+  drag_drop_pairs?: { [key: string]: string };
+  blank_positions?: { [key: string]: string };
 }
 
 const AddQuestions: React.FC = () => {
@@ -26,6 +30,9 @@ const AddQuestions: React.FC = () => {
     options: ["", ""],
     correct_answer: "",
     explanation: "",
+    multiple_correct_answers: [],
+    drag_drop_pairs: {},
+    blank_positions: {},
   });
   const [quizTitle, setQuizTitle] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -68,11 +75,70 @@ const AddQuestions: React.FC = () => {
     } else if (data) {
       const parsedQuestions = data.map(q => ({
         ...q,
-        options: q.options ? JSON.parse(q.options) : undefined
+        options: q.options ? JSON.parse(q.options) : undefined,
+        drag_drop_pairs: q.drag_drop_pairs ? JSON.parse(q.drag_drop_pairs) : undefined,
+        blank_positions: q.blank_positions ? JSON.parse(q.blank_positions) : undefined,
+        multiple_correct_answers: q.multiple_correct_answers || []
       }));
       setQuestions(parsedQuestions);
     }
     setIsLoading(false);
+  };
+
+  const handleQuestionTypeChange = (type: string) => {
+    let newQuestion: Question = {
+      ...currentQuestion,
+      type,
+      text: currentQuestion.text,
+      explanation: currentQuestion.explanation,
+    };
+
+    switch (type) {
+      case "multiple-choice":
+        newQuestion.options = ["", ""];
+        newQuestion.correct_answer = "";
+        delete newQuestion.multiple_correct_answers;
+        delete newQuestion.drag_drop_pairs;
+        delete newQuestion.blank_positions;
+        break;
+      case "multiple-selection":
+        newQuestion.options = ["", ""];
+        newQuestion.multiple_correct_answers = [];
+        newQuestion.correct_answer = "";
+        delete newQuestion.drag_drop_pairs;
+        delete newQuestion.blank_positions;
+        break;
+      case "true-false":
+        newQuestion.options = ["True", "False"];
+        newQuestion.correct_answer = "";
+        delete newQuestion.multiple_correct_answers;
+        delete newQuestion.drag_drop_pairs;
+        delete newQuestion.blank_positions;
+        break;
+      case "drag-drop":
+        newQuestion.drag_drop_pairs = { "": "" };
+        newQuestion.correct_answer = "";
+        delete newQuestion.options;
+        delete newQuestion.multiple_correct_answers;
+        delete newQuestion.blank_positions;
+        break;
+      case "fill-blanks":
+        newQuestion.blank_positions = {};
+        newQuestion.correct_answer = "";
+        delete newQuestion.options;
+        delete newQuestion.multiple_correct_answers;
+        delete newQuestion.drag_drop_pairs;
+        break;
+      case "short-answer":
+        newQuestion.correct_answer = "";
+        delete newQuestion.options;
+        delete newQuestion.multiple_correct_answers;
+        delete newQuestion.drag_drop_pairs;
+        delete newQuestion.blank_positions;
+        break;
+    }
+
+    setCurrentQuestion(newQuestion);
   };
 
   const addQuestion = async () => {
@@ -99,19 +165,22 @@ const AddQuestions: React.FC = () => {
         }
       }
 
+      const questionData = {
+        quiz_id: quizId,
+        type: currentQuestion.type,
+        text: currentQuestion.text,
+        options: currentQuestion.options ? JSON.stringify(currentQuestion.options) : null,
+        correct_answer: currentQuestion.correct_answer,
+        image_url,
+        explanation: currentQuestion.explanation,
+        multiple_correct_answers: currentQuestion.multiple_correct_answers,
+        drag_drop_pairs: currentQuestion.drag_drop_pairs ? JSON.stringify(currentQuestion.drag_drop_pairs) : null,
+        blank_positions: currentQuestion.blank_positions ? JSON.stringify(currentQuestion.blank_positions) : null,
+      };
+
       const { data, error } = await supabase
         .from("questions")
-        .insert([
-          {
-            quiz_id: quizId,
-            type: currentQuestion.type,
-            text: currentQuestion.text,
-            options: JSON.stringify(currentQuestion.options),
-            correct_answer: currentQuestion.correct_answer,
-            image_url,
-            explanation: currentQuestion.explanation,
-          },
-        ])
+        .insert([questionData])
         .select();
 
       if (error) throw error;
@@ -119,7 +188,9 @@ const AddQuestions: React.FC = () => {
       if (data) {
         const newQuestion = {
           ...data[0],
-          options: data[0].options ? JSON.parse(data[0].options) : undefined
+          options: data[0].options ? JSON.parse(data[0].options) : undefined,
+          drag_drop_pairs: data[0].drag_drop_pairs ? JSON.parse(data[0].drag_drop_pairs) : undefined,
+          blank_positions: data[0].blank_positions ? JSON.parse(data[0].blank_positions) : undefined
         };
         setQuestions([...questions, newQuestion]);
         setCurrentQuestion({
@@ -128,6 +199,9 @@ const AddQuestions: React.FC = () => {
           options: ["", ""],
           correct_answer: "",
           explanation: "",
+          multiple_correct_answers: [],
+          drag_drop_pairs: {},
+          blank_positions: {},
         });
         setImageFile(null);
       }
@@ -181,6 +255,241 @@ const AddQuestions: React.FC = () => {
     }
   };
 
+  const renderQuestionTypeSelect = () => (
+    <div>
+      <label htmlFor="questionType" className="block text-sm font-medium text-gray-700 mb-1">
+        Question Type
+      </label>
+      <select
+        id="questionType"
+        value={currentQuestion.type}
+        onChange={(e) => handleQuestionTypeChange(e.target.value)}
+        className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      >
+        <option value="multiple-choice">Multiple Choice</option>
+        <option value="true-false">True/False</option>
+        <option value="short-answer">Short Answer</option>
+        <option value="multiple-selection">Multiple Selection</option>
+        <option value="drag-drop">Drag and Drop</option>
+        <option value="fill-blanks">Fill in the Blanks</option>
+      </select>
+    </div>
+  );
+
+  const renderMultipleChoiceInputs = () => (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Options</label>
+      <div className="space-y-2">
+        {currentQuestion.options?.map((option, index) => (
+          <div key={index} className="flex items-center">
+            <input
+              type="text"
+              value={option}
+              onChange={(e) => handleOptionChange(index, e.target.value)}
+              className="flex-grow p-2 border border-gray-300 rounded-l-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder={`Option ${index + 1}`}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => removeOption(index)}
+              className="p-2 bg-red-100 text-red-600 rounded-r-md hover:bg-red-200"
+            >
+              <MinusCircle size={20} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={addOption}
+        className="mt-2 flex items-center px-3 py-2 bg-green-100 text-green-600 rounded-md hover:bg-green-200"
+      >
+        <PlusCircle size={20} className="mr-2" />
+        Add Option
+      </button>
+    </div>
+  );
+
+  const renderMultipleSelectionInputs = () => (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Options and Correct Answers</label>
+      <div className="space-y-2">
+        {currentQuestion.options?.map((option, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={currentQuestion.multiple_correct_answers?.includes(option)}
+              onChange={(e) => {
+                const newAnswers = e.target.checked
+                  ? [...(currentQuestion.multiple_correct_answers || []), option]
+                  : (currentQuestion.multiple_correct_answers || []).filter(a => a !== option);
+                setCurrentQuestion({
+                  ...currentQuestion,
+                  multiple_correct_answers: newAnswers,
+                  correct_answer: JSON.stringify(newAnswers)
+                });
+              }}
+              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <input
+              type="text"
+              value={option}
+              onChange={(e) => handleOptionChange(index, e.target.value)}
+              className="flex-grow p-2 border border-gray-300 rounded-l-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder={`Option ${index + 1}`}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => removeOption(index)}
+              className="p-2 bg-red-100 text-red-600 rounded-r-md hover:bg-red-200"
+            >
+              <MinusCircle size={20} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={addOption}
+        className="mt-2 flex items-center px-3 py-2 bg-green-100 text-green-600 rounded-md hover:bg-green-200"
+      >
+        <PlusCircle size={20} className="mr-2" />
+        Add Option
+      </button>
+    </div>
+  );
+
+  const renderDragDropInputs = () => (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Term-Definition Pairs</label>
+      <div className="space-y-2">
+        {Object.entries(currentQuestion.drag_drop_pairs || {}).map(([term, definition], index) => (
+          <div key={index} className="flex gap-2">
+            <input
+              type="text"
+              value={term}
+              placeholder="Term"
+              onChange={(e) => {
+                const newPairs = { ...currentQuestion.drag_drop_pairs };
+                const oldTerm = Object.keys(newPairs || {})[index];
+                const def = newPairs?.[oldTerm];
+                delete newPairs?.[oldTerm];
+                newPairs[e.target.value] = def;
+                setCurrentQuestion({
+                  ...currentQuestion,
+                  drag_drop_pairs: newPairs,
+                  correct_answer: JSON.stringify(newPairs)
+                });
+              }}
+              className="flex-1 p-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <input
+              type="text"
+              value={definition}
+              placeholder="Definition"
+              onChange={(e) => {
+                const newPairs = { ...currentQuestion.drag_drop_pairs };
+                if (newPairs) {
+                  newPairs[term] = e.target.value;
+                  setCurrentQuestion({
+                    ...currentQuestion,
+                    drag_drop_pairs: newPairs,
+                    correct_answer: JSON.stringify(newPairs)
+                  });
+                }
+              }}
+              className="flex-1 p-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const newPairs = { ...currentQuestion.drag_drop_pairs };
+                delete newPairs?.[term];
+                setCurrentQuestion({
+                  ...currentQuestion,
+                  drag_drop_pairs: newPairs,
+                  correct_answer: JSON.stringify(newPairs)
+                });
+              }}
+              className="p-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200"
+            >
+              <MinusCircle size={20} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          const newPairs = { ...currentQuestion.drag_drop_pairs, "": "" };
+          setCurrentQuestion({
+            ...currentQuestion,
+            drag_drop_pairs: newPairs,
+            correct_answer: JSON.stringify(newPairs)
+          });
+        }}
+        className="mt-2 flex items-center px-3 py-2 bg-green-100 text-green-600 rounded-md hover:bg-green-200"
+      >
+        <PlusCircle size={20} className="mr-2" />
+        Add Pair
+      </button>
+    </div>
+  );
+
+  const renderFillBlanksInput = () => (
+    <div>
+      <p className="text-sm text-gray-600 mb-2">
+        Use _____ (five underscores) to indicate blank spaces in your text
+      </p>
+      <textarea
+        value={currentQuestion.text}
+        onChange={(e) => {
+          const text = e.target.value;
+          const blanks = text.split('_____').length - 1;
+          const blankPositions: { [key: string]: string } = {};
+          
+          for (let i = 0; i < blanks; i++) {
+            blankPositions[i] = currentQuestion.blank_positions?.[i] || '';
+          }
+          
+          setCurrentQuestion({
+            ...currentQuestion,
+            text,
+            blank_positions: blankPositions
+          });
+        }}
+        rows={3}
+        className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        placeholder="Example: The capital of France is _____ and it is known as the city of _____."
+        required
+      />
+      {Object.keys(currentQuestion.blank_positions || {}).map((index) => (
+        <div key={index} className="mt-2">
+          <label className="text-sm text-gray-600">Answer for blank {Number(index) + 1}:</label>
+          <input
+            type="text"
+            value={currentQuestion.blank_positions?.[index] || ''}
+            onChange={(e) => {
+              const newPositions = { ...currentQuestion.blank_positions };
+              if (newPositions) {
+                newPositions[index] = e.target.value;
+                setCurrentQuestion({
+                  ...currentQuestion,
+                  blank_positions: newPositions,
+                  correct_answer: JSON.stringify(newPositions)
+                });
+              }
+            }}
+            className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent mt-1"
+            required
+          />
+        </div>
+      ))}
+    </div>
+  );
+
   const renderQuestionForm = () => {
     return (
       <motion.div
@@ -192,82 +501,74 @@ const AddQuestions: React.FC = () => {
         <h2 className="text-2xl font-bold text-gray-800 mb-6">Add New Question</h2>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {renderQuestionTypeSelect()}
+
+            {currentQuestion.type !== "drag-drop" && currentQuestion.type !== "fill-blanks" && (
+              <div>
+                <label htmlFor="correctAnswer" className="block text-sm font-medium text-gray-700 mb-1">
+                  Correct Answer
+                </label>
+                {currentQuestion.type === "multiple-choice" ? (
+                  <select
+                    id="correctAnswer"
+                    value={currentQuestion.correct_answer}
+                    onChange={(e) => handleInputChange("correct_answer", e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select correct answer</option>
+                    {currentQuestion.options?.map((option, index) => (
+                      <option key={index} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                ) : currentQuestion.type === "true-false" ? (
+                  <div className="flex space-x-4">
+                    {["True", "False"].map((value) => (
+                      <label key={value} className="inline-flex items-center">
+                        <input
+                          type="radio"
+                          value={value.toLowerCase()}
+                          checked={currentQuestion.correct_answer === value.toLowerCase()}
+                          onChange={(e) => handleInputChange("correct_answer", e.target.value)}
+                          className="form-radio h-4 w-4 text-blue-600"
+                        />
+                        <span className="ml-2">{value}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    id="correctAnswer"
+                    value={currentQuestion.correct_answer}
+                    onChange={(e) => handleInputChange("correct_answer", e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                )}
+              </div>
+            )}
+          </div>
+
+          {currentQuestion.type === "fill-blanks" ? (
+            renderFillBlanksInput()
+          ) : (
             <div>
-              <label htmlFor="questionType" className="block text-sm font-medium text-gray-700 mb-1">
-                Question Type
+              <label htmlFor="questionText" className="block text-sm font-medium text-gray-700 mb-1">
+                Question Text
               </label>
-              <select
-                id="questionType"
-                value={currentQuestion.type}
-                onChange={(e) => handleInputChange("type", e.target.value)}
+              <textarea
+                id="questionText"
+                value={currentQuestion.text}
+                onChange={(e) => handleInputChange("text", e.target.value)}
+                rows={3}
                 className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="multiple-choice">Multiple Choice</option>
-                <option value="true-false">True/False</option>
-                <option value="short-answer">Short Answer</option>
-              </select>
+                required
+              />
             </div>
-
-            <div>
-              <label htmlFor="correctAnswer" className="block text-sm font-medium text-gray-700 mb-1">
-                Correct Answer
-              </label>
-              {currentQuestion.type === "multiple-choice" ? (
-                <select
-                  id="correctAnswer"
-                  value={currentQuestion.correct_answer}
-                  onChange={(e) => handleInputChange("correct_answer", e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="">Select correct answer</option>
-                  {currentQuestion.options?.map((option, index) => (
-                    <option key={index} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              ) : currentQuestion.type === "true-false" ? (
-                <div className="flex space-x-4">
-                  {["True", "False"].map((value) => (
-                    <label key={value} className="inline-flex items-center">
-                      <input
-                        type="radio"
-                        value={value.toLowerCase()}
-                        checked={currentQuestion.correct_answer === value.toLowerCase()}
-                        onChange={(e) => handleInputChange("correct_answer", e.target.value)}
-                        className="form-radio h-4 w-4 text-blue-600"
-                      />
-                      <span className="ml-2">{value}</span>
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <input
-                  type="text"
-                  id="correctAnswer"
-                  value={currentQuestion.correct_answer}
-                  onChange={(e) => handleInputChange("correct_answer", e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="questionText" className="block text-sm font-medium text-gray-700 mb-1">
-              Question Text
-            </label>
-            <textarea
-              id="questionText"
-              value={currentQuestion.text}
-              onChange={(e) => handleInputChange("text", e.target.value)}
-              rows={3}
-              className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
-            />
-          </div>
+          )}
 
           <div>
             <label htmlFor="questionImage" className="block text-sm font-medium text-gray-700 mb-1">
@@ -298,40 +599,9 @@ const AddQuestions: React.FC = () => {
             </div>
           </div>
 
-          {currentQuestion.type === "multiple-choice" && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Options</label>
-              <div className="space-y-2">
-                {currentQuestion.options?.map((option, index) => (
-                  <div key={index} className="flex items-center">
-                    <input
-                      type="text"
-                      value={option}
-                      onChange={(e) => handleOptionChange(index, e.target.value)}
-                      className="flex-grow p-2 border border-gray-300 rounded-l-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder={`Option ${index + 1}`}
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeOption(index)}
-                      className="p-2 bg-red-100 text-red-600 rounded-r-md hover:bg-red-200"
-                    >
-                      <MinusCircle size={20} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={addOption}
-                className="mt-2 flex items-center px-3 py-2 bg-green-100 text-green-600 rounded-md hover:bg-green-200"
-              >
-                <PlusCircle size={20} className="mr-2" />
-                Add Option
-              </button>
-            </div>
-          )}
+          {currentQuestion.type === "multiple-choice" && renderMultipleChoiceInputs()}
+          {currentQuestion.type === "multiple-selection" && renderMultipleSelectionInputs()}
+          {currentQuestion.type === "drag-drop" && renderDragDropInputs()}
 
           <div>
             <label htmlFor="explanation" className="block text-sm font-medium text-gray-700 mb-1">
@@ -374,6 +644,7 @@ const AddQuestions: React.FC = () => {
     );
   };
 
+  // ... Keep your existing renderQuestionList function and the return statement
   const renderQuestionList = () => {
     return (
       <motion.div
@@ -433,7 +704,7 @@ const AddQuestions: React.FC = () => {
       </TeacherLayout>
     );
   }
-
+  
   return (
     <TeacherLayout>
       <div className="max-w-5xl mx-auto p-6">
