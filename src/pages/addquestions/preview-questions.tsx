@@ -5,7 +5,7 @@ import TeacherLayout from "@/comps/teacher-layout";
 import { createClient } from "../../../utils/supabase/component";
 import { motion } from 'framer-motion';
 import Image from 'next/image';
-import type { QuizDetails, QuizDetailsModalProps } from './QuizDetailsModal';
+import type { QuizDetails, QuizDetailsModalProps } from '@/comps/QuizDetailsModal';
 
 // Error Boundary Component
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -58,7 +58,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 
 // Dynamic import of QuizDetailsModal with loading state
 const QuizDetailsModal = dynamic<QuizDetailsModalProps>(
-  () => import('./QuizDetailsModal'),
+  () => import('@/comps/QuizDetailsModal'),
   {
     ssr: false,
     loading: () => (

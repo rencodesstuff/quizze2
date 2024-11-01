@@ -1,4 +1,3 @@
-// components/QuizDetailsModal.tsx
 import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { X, Camera, Check } from 'lucide-react';
@@ -19,6 +18,8 @@ export interface QuizDetailsModalProps {
 const QuizDetailsModal: React.FC<QuizDetailsModalProps> = ({ isOpen, onClose, quizDetails }) => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [joinUrl, setJoinUrl] = useState('');
+
+  if (!quizDetails) return null;
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -164,6 +165,12 @@ const QuizDetailsModal: React.FC<QuizDetailsModalProps> = ({ isOpen, onClose, qu
       </div>
     </div>
   );
+};
+
+export const getStaticProps = async () => {
+  return {
+    notFound: true 
+  };
 };
 
 export default QuizDetailsModal;
