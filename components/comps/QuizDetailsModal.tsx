@@ -19,13 +19,11 @@ const QuizDetailsModal: React.FC<QuizDetailsModalProps> = ({ isOpen, onClose, qu
   const [copiedCode, setCopiedCode] = useState(false);
   const [joinUrl, setJoinUrl] = useState('');
 
-  if (!quizDetails) return null;
-
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && quizDetails?.code) {
       setJoinUrl(`${window.location.origin}/joinquiz?code=${quizDetails.code}`);
     }
-  }, [quizDetails.code]);
+  }, [quizDetails?.code]);
 
   useEffect(() => {
     if (isOpen && typeof document !== 'undefined') {
@@ -37,6 +35,8 @@ const QuizDetailsModal: React.FC<QuizDetailsModalProps> = ({ isOpen, onClose, qu
       }
     };
   }, [isOpen]);
+
+  if (!isOpen || !quizDetails) return null;
 
   const handleCopyCode = async () => {
     try {
@@ -73,8 +73,6 @@ const QuizDetailsModal: React.FC<QuizDetailsModalProps> = ({ isOpen, onClose, qu
       return dateString;
     }
   };
-
-  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -165,12 +163,6 @@ const QuizDetailsModal: React.FC<QuizDetailsModalProps> = ({ isOpen, onClose, qu
       </div>
     </div>
   );
-};
-
-export const getStaticProps = async () => {
-  return {
-    notFound: true 
-  };
 };
 
 export default QuizDetailsModal;
