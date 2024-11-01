@@ -1,10 +1,59 @@
+// pages/stdquiz/[id].tsx
 import React, { useState, useEffect, ErrorInfo, ReactNode } from "react";
 import { useRouter } from "next/router";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { createClient } from "../../../utils/supabase/component";
-import { MultipleChoice, TrueFalse, ShortAnswer } from "@/comps/QuestionTypes";
+import {
+  MultipleChoice,
+  TrueFalse,
+  ShortAnswer,
+  MultipleSelection,
+  QuestionType,
+} from "@/comps/QuestionTypes";
 import ErrorModal from "@/comps/ErrorModal";
+import ExamSecurityWrapper from "@/comps/ExamSecurity";
+
+// Type definitions
+type AnswerType = string | string[];
+
+interface Answers {
+  [questionId: string]: AnswerType;
+}
+
+interface BaseQuestion {
+  id: string;
+  type: QuestionType;
+  text: string;
+  options: string | string[] | null;
+  correct_answer: string;
+  image_url?: string;
+  explanation?: string;
+  multiple_correct_answers?: string[];
+}
+
+interface Quiz {
+  id: string;
+  title: string;
+  duration_minutes: number;
+  release_date: string;
+  questions: BaseQuestion[];
+  randomize_arrangement: boolean;
+  strict_mode: boolean;
+  teacher_id: string;
+}
+
+// Helper function to safely parse JSON strings
+const safeJSONParse = (str: string | null) => {
+  if (!str) return null;
+  try {
+    const cleanStr = str.replace(/\\"/g, '"').replace(/^"|"$/g, "");
+    return JSON.parse(cleanStr);
+  } catch (e) {
+    console.error("Error parsing JSON:", e);
+    return null;
+  }
+};
 
 // Error boundary component
 class ErrorBoundary extends React.Component<
@@ -34,28 +83,8 @@ class ErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return <h1>Something went wrong. Please try refreshing the page.</h1>;
     }
-
     return this.props.children;
   }
-}
-
-interface Question {
-  id: string;
-  type: string;
-  text: string;
-  options: string | string[] | null;
-  correct_answer: string;
-  image_url?: string;
-  explanation?: string;
-}
-
-interface Quiz {
-  id: string;
-  title: string;
-  duration_minutes: number;
-  release_date: string;
-  questions: Question[];
-  randomize_arrangement: boolean;
 }
 
 const TakeQuiz: React.FC = () => {
@@ -63,7 +92,7 @@ const TakeQuiz: React.FC = () => {
   const { id } = router.query;
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Answers>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [studentInfo, setStudentInfo] = useState({ name: "", id: "" });
@@ -96,9 +125,11 @@ const TakeQuiz: React.FC = () => {
             .from("quizzes")
             .select(
               `
-            id, title, duration_minutes, release_date, randomize_arrangement,
-            questions (id, type, text, options, correct_answer, image_url)
-          `
+              id, title, duration_minutes, release_date, 
+              randomize_arrangement, strict_mode, teacher_id,
+              questions (id, type, text, options, correct_answer, image_url,
+                      explanation, multiple_correct_answers)
+            `
             )
             .eq("id", id)
             .single(),
@@ -112,17 +143,17 @@ const TakeQuiz: React.FC = () => {
           id: studentData.data.student_id,
         });
 
-        // Generate a random seed based on the student ID and quiz ID
         const seed = hashCode(
           `${studentData.data.student_id}-${quizData.data.id}`
         );
         setRandomSeed(seed);
 
-        // Validate and potentially randomize quiz data
-        let validatedQuestions = quizData.data.questions.map((q: Question) => ({
-          ...q,
-          options: validateQuestionOptions(q),
-        }));
+        let validatedQuestions = quizData.data.questions.map(
+          (q: BaseQuestion) => ({
+            ...q,
+            options: validateQuestionOptions(q),
+          })
+        );
 
         if (quizData.data.randomize_arrangement) {
           validatedQuestions = shuffleArray(validatedQuestions, seed);
@@ -145,6 +176,7 @@ const TakeQuiz: React.FC = () => {
     fetchQuizAndStudentInfo();
   }, [id]);
 
+  // Timer effect
   useEffect(() => {
     if (timeLeft === null || timeLeft <= 0 || quizSubmitted) return;
     const timer = setInterval(
@@ -159,7 +191,7 @@ const TakeQuiz: React.FC = () => {
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
       hash = (hash << 5) - hash + char;
-      hash = hash & hash; 
+      hash = hash & hash;
     }
     return Math.abs(hash);
   };
@@ -170,19 +202,14 @@ const TakeQuiz: React.FC = () => {
       temporaryValue,
       randomIndex;
 
-    // Create a seeded random number generator
     const seededRandom = () => {
       seed = (seed * 9301 + 49297) % 233280;
       return seed / 233280;
     };
 
-    // While there remain elements to shuffle
     while (0 !== currentIndex) {
-      // Pick a remaining element
       randomIndex = Math.floor(seededRandom() * currentIndex);
       currentIndex -= 1;
-
-      // And swap it with the current element.
       temporaryValue = shuffled[currentIndex];
       shuffled[currentIndex] = shuffled[randomIndex];
       shuffled[randomIndex] = temporaryValue;
@@ -191,52 +218,43 @@ const TakeQuiz: React.FC = () => {
     return shuffled;
   };
 
-  const parseOptions = (options: string | string[] | null): string[] | null => {
-    if (Array.isArray(options)) {
-      return options;
-    }
-    if (typeof options === "string") {
-      try {
-        const parsedOptions = JSON.parse(options);
-        if (Array.isArray(parsedOptions)) {
-          return parsedOptions;
-        }
-      } catch (error) {
-        console.error("Error parsing options:", error);
-      }
-    }
-    return null;
-  };
+  const validateQuestionOptions = (question: BaseQuestion): string[] | null => {
+    let parsedOptions = question.options;
 
-  const validateQuestionOptions = (question: Question): string[] | null => {
-    const questionType = question.type.toLowerCase().replace(/[^a-z0-9]/g, "_");
-    const parsedOptions = parseOptions(question.options);
+    if (typeof question.options === "string") {
+      parsedOptions = safeJSONParse(question.options);
+    }
 
-    switch (questionType) {
-      case "multiple_choice":
+    switch (question.type) {
+      case "multiple-choice":
+      case "multiple-selection":
         if (
-          parsedOptions &&
+          Array.isArray(parsedOptions) &&
           parsedOptions.every((opt) => typeof opt === "string")
         ) {
-          return parsedOptions;
+          return parsedOptions.map((opt) => opt.trim());
         }
-        throw new Error(
-          `Invalid options for multiple choice question ${question.id}`
-        );
+        return null;
 
-      case "true_false":
+      case "true-false":
         return ["True", "False"];
 
-      case "short_answer":
+      case "short-answer":
         return null;
 
       default:
-        throw new Error(`Unsupported question type: ${question.type}`);
+        console.warn(`Unexpected question type: ${question.type}`);
+        return null;
     }
   };
 
-  const handleAnswer = (questionId: string, answer: string) =>
-    setAnswers((prev) => ({ ...prev, [questionId]: answer }));
+  const handleAnswer = (questionId: string, answer: AnswerType) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]:
+        typeof answer === "object" ? JSON.stringify(answer) : answer,
+    }));
+  };
 
   const handleNavigation = (direction: "next" | "prev") => {
     if (!quiz) return;
@@ -263,19 +281,57 @@ const TakeQuiz: React.FC = () => {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("No authenticated user found");
 
-      const score = quiz.questions.reduce(
-        (acc, q) =>
-          acc +
-          (answers[q.id]?.toLowerCase() === q.correct_answer.toLowerCase()
-            ? 1
-            : 0),
-        0
-      );
+      const processedAnswers = Object.entries(answers).reduce<
+        Record<string, any>
+      >((acc, [qId, answer]) => {
+        const question = quiz.questions.find((q) => q.id === qId);
+        if (!question) return acc;
+
+        let processedAnswer = answer;
+        try {
+          if (
+            typeof answer === "string" &&
+            question.type === "multiple-selection"
+          ) {
+            processedAnswer = JSON.parse(answer);
+          }
+        } catch (e) {
+          console.error("Error processing answer:", e);
+        }
+
+        return { ...acc, [qId]: processedAnswer };
+      }, {});
+
+      const score = quiz.questions.reduce((acc, q) => {
+        const processedAnswer = processedAnswers[q.id];
+        let isCorrect = false;
+
+        switch (q.type) {
+          case "multiple-selection":
+            const correctAnswers = Array.isArray(q.multiple_correct_answers)
+              ? q.multiple_correct_answers
+              : typeof q.multiple_correct_answers === "string" &&
+                q.multiple_correct_answers
+              ? safeJSONParse(q.multiple_correct_answers) || []
+              : [];
+            isCorrect =
+              JSON.stringify(processedAnswer?.sort()) ===
+              JSON.stringify(correctAnswers.sort());
+            break;
+
+          default:
+            isCorrect =
+              String(processedAnswer).toLowerCase() ===
+              String(q.correct_answer).toLowerCase();
+        }
+
+        return acc + (isCorrect ? 1 : 0);
+      }, 0);
 
       const { error } = await supabase.from("quiz_submissions").insert({
         student_id: user.id,
         quiz_id: id,
-        answers,
+        answers: processedAnswers,
         score: Math.round((score / quiz.questions.length) * 100),
         total_questions: quiz.questions.length,
         correct_answers: score,
@@ -288,49 +344,107 @@ const TakeQuiz: React.FC = () => {
       setSubmitError(
         `Failed to submit quiz: ${
           error instanceof Error ? error.message : "Unknown error"
-        }. Please try again.`
+        }`
       );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const renderQuestionOptions = (question: Question) => {
-    const parsedOptions = parseOptions(question.options);
-    const props = {
-      question: {
-        ...question,
-        options: parsedOptions,
-      },
-      answers,
-      handleAnswer,
+  const renderQuestionOptions = (question: BaseQuestion) => {
+    const enhancedQuestion = {
+      ...question,
+      options:
+        typeof question.options === "string"
+          ? safeJSONParse(question.options)
+          : question.options,
+      multiple_correct_answers: (() => {
+        if (Array.isArray(question.multiple_correct_answers)) {
+          return question.multiple_correct_answers;
+        }
+        if (
+          typeof question.multiple_correct_answers === "string" &&
+          question.multiple_correct_answers
+        ) {
+          return safeJSONParse(question.multiple_correct_answers) || [];
+        }
+        return [];
+      })(),
     };
 
-    try {
-      switch (question.type.toLowerCase().replace(/[^a-z0-9]/g, "_")) {
-        case "multiple_choice":
-          return <MultipleChoice {...props} />;
-        case "true_false":
-          return <TrueFalse {...props} />;
-        case "short_answer":
-          return <ShortAnswer {...props} />;
-        default:
-          throw new Error(`Unsupported question type: ${question.type}`);
+    let currentAnswer: AnswerType = answers[question.id] || "";
+    if (
+      typeof currentAnswer === "string" &&
+      question.type === "multiple-selection"
+    ) {
+      try {
+        currentAnswer = JSON.parse(currentAnswer);
+      } catch (e) {
+        console.error("Error parsing answer:", e);
+        currentAnswer = [];
       }
-    } catch (error) {
-      console.error(`Error rendering question ${question.id}:`, error);
-      return (
-        <p className="text-red-500">
-          Error loading question. Please try refreshing the page.
-        </p>
-      );
+    }
+
+    const commonProps = {
+      question: enhancedQuestion,
+      answers: {
+        ...answers,
+        [question.id]: currentAnswer,
+      } as Answers,
+      handleAnswer,
+      showExplanation: false,
+    };
+
+    switch (question.type) {
+      case "multiple-choice":
+        return enhancedQuestion.options ? (
+          <MultipleChoice {...commonProps} />
+        ) : (
+          <p className="text-red-500">
+            No options available for this question.
+          </p>
+        );
+
+      case "true-false":
+        return <TrueFalse {...commonProps} />;
+
+      case "short-answer":
+        return <ShortAnswer {...commonProps} />;
+
+      case "multiple-selection":
+        return enhancedQuestion.options ? (
+          <MultipleSelection {...commonProps} />
+        ) : (
+          <p className="text-red-500">
+            No options available for this question.
+          </p>
+        );
+
+      default:
+        console.warn(`Unexpected question type: ${question.type}`);
+        return null;
+    }
+  };
+
+  const formatAnswer = (question: BaseQuestion, answer: any): string => {
+    try {
+      if (
+        typeof answer === "string" &&
+        question.type === "multiple-selection"
+      ) {
+        const parsed = JSON.parse(answer);
+        return Array.isArray(parsed) ? parsed.join(", ") : answer;
+      }
+      return String(answer);
+    } catch (e) {
+      return String(answer);
     }
   };
 
   const handleError = (error: Error, errorInfo: ErrorInfo) => {
     console.error("Caught an error:", error, errorInfo);
     setErrorMessage(
-      `An unexpected error occurred. Please try refreshing the page or contact support if the problem persists.`
+      "An unexpected error occurred. Please try refreshing the page."
     );
   };
 
@@ -343,39 +457,50 @@ const TakeQuiz: React.FC = () => {
     );
   }
 
-  if (!quiz)
+  if (!quiz) {
     return (
       <div className="h-screen flex items-center justify-center">
-        Loading quiz...
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
+  }
 
   const currentQuestion = quiz.questions[currentQuestionIndex];
 
-  return (
-    <ErrorBoundary onError={handleError}>
-      <div className="min-h-screen bg-gray-100 flex flex-col">
-        <header className="bg-white shadow-md p-4">
-          <div className="max-w-7xl mx-auto flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-800">{quiz.title}</h1>
-            <div className="text-right">
-              <p className="text-sm text-gray-600">{studentInfo.name}</p>
-              <p className="text-sm text-gray-600">
-                Student ID: {studentInfo.id}
-              </p>
-              <p className="text-sm font-bold text-blue-600">
-                Time left: {Math.floor(timeLeft! / 60)}:
-                {(timeLeft! % 60).toString().padStart(2, "0")}
-              </p>
-            </div>
-          </div>
-        </header>
+  const isAnswerEmpty = (answer: AnswerType): boolean => {
+    if (!answer) return true;
+    if (typeof answer === "string") return answer.trim() === "";
+    if (Array.isArray(answer)) return answer.length === 0;
+    return true;
+  };
 
-        <main className="flex-grow flex p-4">
-          <div className="w-1/4 bg-white shadow-xl rounded-lg p-4 mr-4">
-            <h2 className="text-lg font-bold mb-4">Questions</h2>
-            <div className="space-y-2">
-              {quiz.questions.map((q, index) => (
+  const QuizContent = () => (
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      <header className="bg-white shadow-md p-4">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-800">{quiz.title}</h1>
+          <div className="text-right">
+            <p className="text-sm text-gray-600">{studentInfo.name}</p>
+            <p className="text-sm text-gray-600">
+              Student ID: {studentInfo.id}
+            </p>
+            <p className="text-sm font-bold text-blue-600">
+              Time left: {Math.floor(timeLeft! / 60)}:
+              {(timeLeft! % 60).toString().padStart(2, "0")}
+            </p>
+          </div>
+        </div>
+      </header>
+  
+      <main className="flex-grow flex p-4">
+        <div className="w-1/4 bg-white shadow-xl rounded-lg p-4 mr-4">
+          <h2 className="text-lg font-bold mb-4">Questions</h2>
+          <div className="space-y-2">
+            {quiz.questions.map((q, index) => {
+              const hasAnswer =
+                q.id in answers && !isAnswerEmpty(answers[q.id]);
+  
+              return (
                 <button
                   key={q.id}
                   onClick={() => setCurrentQuestionIndex(index)}
@@ -386,121 +511,151 @@ const TakeQuiz: React.FC = () => {
                   }`}
                 >
                   Question {index + 1}
-                  {answers[q.id] && answers[q.id].trim() !== "" && (
-                    <span className="ml-2 text-green-500">✓</span>
-                  )}
+                  {hasAnswer && <span className="ml-2 text-green-500">✓</span>}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
-
-          <motion.div
-            key={currentQuestionIndex}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.5 }}
-            className="flex-grow bg-white shadow-xl rounded-lg p-8"
-          >
-            <h2 className="text-xl font-bold mb-4">
-              Question {currentQuestionIndex + 1} of {quiz.questions.length}
-            </h2>
-            <p className="text-lg mb-6">{currentQuestion.text}</p>
-            {currentQuestion.image_url && (
-              <div className="mb-6">
-                <Image
-                  src={currentQuestion.image_url}
-                  alt={`Image for question ${currentQuestionIndex + 1}`}
-                  width={400}
-                  height={300}
-                  layout="responsive"
-                />
-              </div>
-            )}
-            {renderQuestionOptions(currentQuestion)}
-            <div className="flex justify-between mt-6">
-              <button
-                onClick={() => handleNavigation("prev")}
-                disabled={currentQuestionIndex === 0}
-                className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition duration-150 disabled:opacity-50"
-              >
-                Previous
-              </button>
-              {currentQuestionIndex === quiz.questions.length - 1 ? (
-                <button
-                  onClick={() => setShowConfirmation(true)}
-                  className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150"
-                >
-                  Review Answers
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleNavigation("next")}
-                  className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition duration-150"
-                >
-                  Next
-                </button>
-              )}
-            </div>
-          </motion.div>
-        </main>
-
-        <AnimatePresence>
-          {showConfirmation && (
+        </div>
+  
+        <div className="flex-grow relative">
+          <AnimatePresence mode="wait" initial={false}>
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
+              key={currentQuestionIndex}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="bg-white shadow-xl rounded-lg p-8 absolute inset-0"
             >
-              <motion.div
-                initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0.9 }}
-                className="bg-white p-8 rounded-lg max-w-2xl w-full"
-              >
-                <h2 className="text-2xl font-bold mb-4">Review Your Answers</h2>
+              <h2 className="text-xl font-bold mb-4">
+                Question {currentQuestionIndex + 1} of {quiz.questions.length}
+              </h2>
+              <p className="text-lg mb-6">{currentQuestion.text}</p>
+              {currentQuestion.image_url && (
+                <div className="mb-6">
+                  <Image
+                    src={currentQuestion.image_url}
+                    alt={`Image for question ${currentQuestionIndex + 1}`}
+                    width={400}
+                    height={300}
+                    objectFit="contain"
+                  />
+                </div>
+              )}
+              <div className="question-options">
+                {renderQuestionOptions(currentQuestion)}
+              </div>
+              <div className="flex justify-between mt-6">
+                <button
+                  onClick={() => handleNavigation("prev")}
+                  disabled={currentQuestionIndex === 0}
+                  className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors duration-150 disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                {currentQuestionIndex === quiz.questions.length - 1 ? (
+                  <button
+                    onClick={() => setShowConfirmation(true)}
+                    className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors duration-150"
+                  >
+                    Review Answers
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleNavigation("next")}
+                    className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-150"
+                  >
+                    Next
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </main>
+
+      <AnimatePresence>
+        {showConfirmation && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="bg-white p-8 rounded-lg max-w-2xl w-full m-4"
+            >
+              <h2 className="text-2xl font-bold mb-4">Review Your Answers</h2>
+              <div className="max-h-[60vh] overflow-y-auto">
                 {quiz.questions.map((question, index) => (
-                  <div key={question.id} className="mb-4">
+                  <div
+                    key={question.id}
+                    className="mb-4 p-4 bg-gray-50 rounded-lg"
+                  >
                     <p className="font-semibold">
                       Question {index + 1}: {question.text}
                     </p>
                     <p
                       className={
-                        answers[question.id]
-                          ? "text-blue-600"
-                          : "text-yellow-600"
+                        question.id in answers
+                          ? "text-blue-600 mt-2"
+                          : "text-yellow-600 mt-2"
                       }
                     >
-                      {answers[question.id]
-                        ? `Your answer: ${answers[question.id]}`
-                        : "Skipped"}
+                      {question.id in answers
+                        ? `Your answer: ${formatAnswer(
+                            question,
+                            answers[question.id]
+                          )}`
+                        : "Not answered"}
                     </p>
                   </div>
                 ))}
-                <div className="flex justify-between mt-6">
-                  <button
-                    onClick={() => setShowConfirmation(false)}
-                    className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition duration-150"
-                  >
-                    Go Back
-                  </button>
-                  <button
-                    onClick={handleSubmitQuiz}
-                    disabled={isSubmitting}
-                    className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150 disabled:opacity-50"
-                  >
-                    {isSubmitting ? "Submitting..." : "Confirm Submission"}
-                  </button>
-                </div>
-                {submitError && (
-                  <p className="mt-4 text-red-500 text-center">{submitError}</p>
-                )}
-              </motion.div>
+              </div>
+              <div className="flex justify-between mt-6">
+                <button
+                  onClick={() => setShowConfirmation(false)}
+                  className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition duration-150"
+                >
+                  Go Back
+                </button>
+                <button
+                  onClick={handleSubmitQuiz}
+                  disabled={isSubmitting}
+                  className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150 disabled:opacity-50"
+                >
+                  {isSubmitting ? "Submitting..." : "Confirm Submission"}
+                </button>
+              </div>
+              {submitError && (
+                <p className="mt-4 text-red-500 text-center">{submitError}</p>
+              )}
             </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+
+  return (
+    <ErrorBoundary onError={handleError}>
+      {quiz.strict_mode ? (
+        <ExamSecurityWrapper
+          quizId={id as string}
+          teacherId={quiz.teacher_id}
+          studentName={studentInfo.name}
+          quizTitle={quiz.title}
+          strictMode={quiz.strict_mode}
+        >
+          <QuizContent />
+        </ExamSecurityWrapper>
+      ) : (
+        <QuizContent />
+      )}
     </ErrorBoundary>
   );
 };

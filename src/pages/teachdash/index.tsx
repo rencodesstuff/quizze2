@@ -1,8 +1,11 @@
+// pages/teachquiz/index.tsx
 import React, { useEffect, useState } from "react";
 import TeacherLayout from "@/comps/teacher-layout";
 import { Tab } from '@headlessui/react';
 import { FaClipboardList, FaUserGraduate } from 'react-icons/fa';
 import { createClient } from "../../../utils/supabase/component";
+import SecurityNotifications from "@/comps/SecurityNotifications";
+import { useRouter } from 'next/router';
 
 interface TeacherDashboardProps {
   user?: {
@@ -11,11 +14,15 @@ interface TeacherDashboardProps {
 }
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user }) => {
+  const router = useRouter();
   const [teacherName, setTeacherName] = useState("");
   const [activeQuizzes, setActiveQuizzes] = useState(0);
   const [totalStudents, setTotalStudents] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [recentQuizzes, setRecentQuizzes] = useState<any[]>([]);
+  const [topStudents, setTopStudents] = useState<any[]>([]);
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchTeacherData = async () => {
@@ -50,7 +57,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user }) => {
 
         setTeacherName(teacherData.name);
 
-        // Fetch active quizzes count for this teacher
+        // Fetch active quizzes count
         const { count: quizCount, error: quizError } = await supabase
           .from('quizzes')
           .select('id', { count: 'exact' })
@@ -60,6 +67,17 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user }) => {
         if (quizError) throw new Error('Error fetching quiz count');
         setActiveQuizzes(quizCount || 0);
 
+        // Fetch recent quizzes
+        const { data: recentQuizzesData, error: recentQuizzesError } = await supabase
+          .from('quizzes')
+          .select('*')
+          .eq('teacher_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (recentQuizzesError) throw recentQuizzesError;
+        setRecentQuizzes(recentQuizzesData || []);
+
         // Fetch quiz IDs for this teacher
         const { data: quizIds, error: quizIdsError } = await supabase
           .from('quizzes')
@@ -68,7 +86,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user }) => {
 
         if (quizIdsError) throw new Error('Error fetching quiz IDs');
 
-        // Fetch total unique students count based on quiz submissions
+        // Fetch total unique students count
         if (quizIds && quizIds.length > 0) {
           const { count: studentCount, error: studentError } = await supabase
             .from('quiz_submissions')
@@ -77,6 +95,37 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user }) => {
 
           if (studentError) throw new Error('Error fetching student count');
           setTotalStudents(studentCount || 0);
+
+          // Fetch top performing students
+          const { data: topStudentsData, error: topStudentsError } = await supabase
+            .from('quiz_submissions')
+            .select(`
+              student_id,
+              students (name),
+              score
+            `)
+            .in('quiz_id', quizIds.map(q => q.id))
+            .order('score', { ascending: false })
+            .limit(5);
+
+          if (topStudentsError) throw topStudentsError;
+          setTopStudents(topStudentsData || []);
+
+          // Fetch recent activities
+          const { data: recentActivitiesData, error: activitiesError } = await supabase
+            .from('quiz_submissions')
+            .select(`
+              id,
+              submitted_at,
+              students (name),
+              quizzes (title)
+            `)
+            .in('quiz_id', quizIds.map(q => q.id))
+            .order('submitted_at', { ascending: false })
+            .limit(5);
+
+          if (activitiesError) throw activitiesError;
+          setRecentActivities(recentActivitiesData || []);
         } else {
           setTotalStudents(0);
         }
@@ -92,20 +141,63 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user }) => {
     fetchTeacherData();
   }, [user?.id]);
 
+  const handleCreateQuiz = () => {
+    router.push('/createquiz');
+  };
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const formatTimeAgo = (date: string) => {
+    const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
+    const intervals = {
+      year: 31536000,
+      month: 2592000,
+      week: 604800,
+      day: 86400,
+      hour: 3600,
+      minute: 60
+    };
+
+    for (const [unit, secondsInUnit] of Object.entries(intervals)) {
+      const interval = Math.floor(seconds / secondsInUnit);
+      if (interval >= 1) {
+        return `${interval} ${unit}${interval === 1 ? '' : 's'} ago`;
+      }
+    }
+    return 'Just now';
+  };
+
   if (loading) {
-    return <div className="flex justify-center items-center h-screen">
-      <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900"></div>
-    </div>;
+    return (
+      <TeacherLayout>
+        <div className="flex justify-center items-center h-screen">
+          <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900"></div>
+        </div>
+      </TeacherLayout>
+    );
   }
 
   if (error) {
-    return <div className="flex justify-center items-center h-screen">
-      <div className="text-red-500 text-xl">{error}</div>
-    </div>;
+    return (
+      <TeacherLayout>
+        <div className="flex justify-center items-center h-screen">
+          <div className="text-red-500 text-xl">{error}</div>
+        </div>
+      </TeacherLayout>
+    );
   }
 
   return (
     <TeacherLayout>
+      {/* Security Notifications Component */}
+      <SecurityNotifications />
+
       <div className="bg-white p-6 rounded-lg shadow-md overflow-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
           <div className="mb-4 md:mb-0">
@@ -116,7 +208,10 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user }) => {
               Here&apos;s what&apos;s happening in your classes today.
             </p>
           </div>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition">
+          <button 
+            onClick={handleCreateQuiz}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition"
+          >
             Create New Quiz
           </button>
         </div>
@@ -140,38 +235,45 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user }) => {
           <div className="bg-white shadow rounded-lg p-6">
             <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
             <ul className="space-y-4">
-              {[
-                { action: "Quiz submitted", subject: "Math 101", student: "John Doe", time: "2 hours ago" },
-                { action: "Assignment graded", subject: "Physics 202", student: "Jane Smith", time: "5 hours ago" },
-                { action: "Discussion post", subject: "Literature 301", student: "Alice Johnson", time: "1 day ago" },
-              ].map((activity, index) => (
+              {recentActivities.map((activity, index) => (
                 <li key={index} className="flex items-center">
                   <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
                   <div>
-                    <p className="font-medium">{activity.action} - {activity.subject}</p>
-                    <p className="text-sm text-gray-600">{activity.student} • {activity.time}</p>
+                    <p className="font-medium">Quiz submitted - {activity.quizzes.title}</p>
+                    <p className="text-sm text-gray-600">
+                      {activity.students.name} • {formatTimeAgo(activity.submitted_at)}
+                    </p>
                   </div>
                 </li>
               ))}
+              {recentActivities.length === 0 && (
+                <li className="text-gray-500">No recent activity</li>
+              )}
             </ul>
           </div>
 
           <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Upcoming Classes</h2>
+            <h2 className="text-xl font-semibold mb-4">Upcoming Quizzes</h2>
             <ul className="space-y-4">
-              {[
-                { subject: "Math 101", time: "09:00 AM", room: "Room 301" },
-                { subject: "Physics 202", time: "11:00 AM", room: "Lab 2" },
-                { subject: "Computer Science 303", time: "02:00 PM", room: "Room 405" },
-              ].map((class_, index) => (
-                <li key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                  <div>
-                    <p className="font-medium">{class_.subject}</p>
-                    <p className="text-sm text-gray-600">{class_.time}</p>
-                  </div>
-                  <span className="text-sm bg-blue-100 text-blue-800 py-1 px-2 rounded">{class_.room}</span>
-                </li>
-              ))}
+              {recentQuizzes
+                .filter(quiz => new Date(quiz.release_date) > new Date())
+                .map((quiz, index) => (
+                  <li key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                    <div>
+                      <p className="font-medium">{quiz.title}</p>
+                      <p className="text-sm text-gray-600">{formatDate(quiz.release_date)}</p>
+                    </div>
+                    <span className="text-sm bg-blue-100 text-blue-800 py-1 px-2 rounded">
+                      {new Date(quiz.release_date).toLocaleTimeString('en-US', { 
+                        hour: '2-digit', 
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </li>
+                ))}
+              {recentQuizzes.filter(quiz => new Date(quiz.release_date) > new Date()).length === 0 && (
+                <li className="text-gray-500">No upcoming quizzes</li>
+              )}
             </ul>
           </div>
         </div>
@@ -197,33 +299,29 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user }) => {
             <Tab.Panels className="mt-4">
               <Tab.Panel>
                 <ul className="space-y-2">
-                  {[
-                    { name: "Math Quiz", date: "July 10, 2024", status: "Active" },
-                    { name: "CS101 Quiz", date: "July 15, 2024", status: "Draft" },
-                    { name: "AI Basics Quiz", date: "July 20, 2024", status: "Active" },
-                  ].map((quiz, index) => (
+                  {recentQuizzes.map((quiz, index) => (
                     <li key={index} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
-                      <span>{quiz.name}</span>
-                      <span>{quiz.date}</span>
+                      <span>{quiz.title}</span>
+                      <span>{formatDate(quiz.created_at)}</span>
                       <span className={`px-2 py-1 rounded ${
-                        quiz.status === 'Active' ? 'bg-green-200 text-green-800' : 'bg-yellow-200 text-yellow-800'
+                        new Date(quiz.release_date) <= new Date() 
+                          ? 'bg-green-200 text-green-800' 
+                          : 'bg-yellow-200 text-yellow-800'
                       }`}>
-                        {quiz.status}
+                        {new Date(quiz.release_date) <= new Date() ? 'Active' : 'Scheduled'}
                       </span>
                     </li>
                   ))}
+                  {recentQuizzes.length === 0 && (
+                    <li className="text-gray-500">No quizzes created yet</li>
+                  )}
                 </ul>
               </Tab.Panel>
               <Tab.Panel>
                 <ul className="space-y-2">
-                  {[
-                    { name: "Syed Zabir", score: 95 },
-                    { name: "Shahmi", score: 92 },
-                    { name: "Aiman", score: 90 },
-                    { name: "Syasya", score: 88 },
-                  ].map((student, index) => (
+                  {topStudents.map((student, index) => (
                     <li key={index} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
-                      <span>{student.name}</span>
+                      <span>{student.students.name}</span>
                       <span className={`font-semibold ${
                         student.score >= 90 ? 'text-green-600' : 
                         student.score >= 80 ? 'text-blue-600' : 
@@ -231,6 +329,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user }) => {
                       }`}>{student.score}%</span>
                     </li>
                   ))}
+                  {topStudents.length === 0 && (
+                    <li className="text-gray-500">No quiz submissions yet</li>
+                  )}
                 </ul>
               </Tab.Panel>
             </Tab.Panels>

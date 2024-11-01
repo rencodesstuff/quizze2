@@ -1,21 +1,60 @@
+// hooks/useQuizzes.ts
 import { useState, useCallback, useEffect } from 'react';
 import { createClient } from "../../utils/supabase/component";
 
+// Define the quiz interface for validated data
 interface Quiz {
   id: string;
   title: string;
-  duration_minutes?: number | null;
+  duration_minutes: number | null;
   release_date: string | null;
+  code: string | null;
+  created_at: string;
 }
 
-export const useQuizzes = () => {
+// Define a base quiz type for type checking
+type BaseQuizData = {
+  id: unknown;
+  title: unknown;
+  duration_minutes: unknown;
+  release_date: unknown;
+  code: unknown;
+  created_at: unknown;
+}
+
+interface UseQuizzesReturn {
+  activeQuizzes: Quiz[];
+  upcomingQuizzes: Quiz[];
+  completedQuizzes: Quiz[];
+  joinQuiz: (quizCode: string) => Promise<void>;
+  refreshQuizzes: () => Promise<void>;
+  loading: boolean;
+}
+
+export const useQuizzes = (): UseQuizzesReturn => {
   const [activeQuizzes, setActiveQuizzes] = useState<Quiz[]>([]);
   const [upcomingQuizzes, setUpcomingQuizzes] = useState<Quiz[]>([]);
   const [completedQuizzes, setCompletedQuizzes] = useState<Quiz[]>([]);
+  const [loading, setLoading] = useState(true);
   
   const supabase = createClient();
 
+  // Type guard function
+  const isValidQuiz = (quiz: BaseQuizData | null): quiz is Quiz => {
+    if (!quiz) return false;
+    
+    return (
+      typeof quiz.id === 'string' &&
+      typeof quiz.title === 'string' &&
+      (quiz.duration_minutes === null || typeof quiz.duration_minutes === 'number') &&
+      (quiz.release_date === null || typeof quiz.release_date === 'string') &&
+      (quiz.code === null || typeof quiz.code === 'string') &&
+      typeof quiz.created_at === 'string'
+    );
+  };
+
   const fetchQuizzes = useCallback(async () => {
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user found');
@@ -26,7 +65,14 @@ export const useQuizzes = () => {
         .from('student_quizzes')
         .select(`
           quiz_id,
-          quizzes (*)
+          quizzes (
+            id,
+            title,
+            duration_minutes,
+            release_date,
+            code,
+            created_at
+          )
         `)
         .eq('student_id', user.id);
 
@@ -35,12 +81,7 @@ export const useQuizzes = () => {
       const allJoinedQuizzes = joinedData
         .flatMap(item => {
           const quizzes = Array.isArray(item.quizzes) ? item.quizzes : [item.quizzes];
-          return quizzes.filter((quiz): quiz is Quiz => 
-            !!quiz && 
-            typeof quiz.id === 'string' &&
-            typeof quiz.title === 'string' &&
-            (quiz.release_date === null || typeof quiz.release_date === 'string')
-          );
+          return quizzes.filter((quiz): quiz is Quiz => isValidQuiz(quiz as BaseQuizData));
         });
 
       const { data: submissionData, error: submissionError } = await supabase
@@ -68,18 +109,22 @@ export const useQuizzes = () => {
 
     } catch (error) {
       console.error('Error fetching quizzes:', error);
+      setUpcomingQuizzes([]);
+      setActiveQuizzes([]);
+      setCompletedQuizzes([]);
+    } finally {
+      setLoading(false);
     }
   }, [supabase]);
 
   const joinQuiz = async (quizCode: string) => {
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user found');
 
-      // Set the current quiz code
       await supabase.rpc('set_current_quiz_code', { quiz_code: quizCode });
 
-      // Query the quizzes table with the set quiz code
       const { data: quizData, error: quizError } = await supabase
         .from('quizzes')
         .select('*')
@@ -87,25 +132,35 @@ export const useQuizzes = () => {
         .single();
 
       if (quizError) throw quizError;
-      if (!quizData) throw new Error('Invalid quiz code');
+      if (!quizData || !isValidQuiz(quizData as BaseQuizData)) {
+        throw new Error('Invalid quiz code');
+      }
 
-      // Join the quiz
+      const { data: existingJoin } = await supabase
+        .from('student_quizzes')
+        .select('id')
+        .eq('student_id', user.id)
+        .eq('quiz_id', quizData.id)
+        .single();
+
+      if (existingJoin) {
+        throw new Error('You have already joined this quiz');
+      }
+
       const { error: joinError } = await supabase
         .from('student_quizzes')
         .insert({ student_id: user.id, quiz_id: quizData.id });
 
       if (joinError) throw joinError;
 
-      // Clear the current quiz code setting
       await supabase.rpc('clear_current_quiz_code');
-
-      // Refresh quizzes after joining
       await fetchQuizzes();
     } catch (error) {
-      // Clear the current quiz code setting in case of error
       await supabase.rpc('clear_current_quiz_code');
       console.error('Error joining quiz:', error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -118,6 +173,7 @@ export const useQuizzes = () => {
     upcomingQuizzes,
     completedQuizzes,
     joinQuiz,
-    refreshQuizzes: fetchQuizzes
+    refreshQuizzes: fetchQuizzes,
+    loading
   };
 };

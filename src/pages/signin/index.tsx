@@ -1,9 +1,9 @@
+// pages/signin/index.tsx
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router'
 import Link from 'next/link';
 import Head from 'next/head';
 import GradientCanvas from '@/gradient/GradientCanvas';
-
 import { createClient } from '../../../utils/supabase/component';
 
 const SignInPage = () => {
@@ -14,8 +14,44 @@ const SignInPage = () => {
   const [password, setPassword] = useState('');
   const [isSmallScreen, setIsSmallScreen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Clear any existing history when reaching the signin page
+    if (window.history && window.history.pushState) {
+      window.history.pushState(null, '', '/signin');
+    }
+
+    // Check if user is already authenticated
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        // Fetch user role
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+
+        // Redirect to appropriate dashboard
+        if (roleData) {
+          switch(roleData.role) {
+            case 'student':
+              router.replace('/studentdash');
+              break;
+            case 'teacher':
+              router.replace('/teachdash');
+              break;
+            case 'admin':
+              router.replace('/admindashboard');
+              break;
+          }
+        }
+      }
+    };
+
+    checkAuth();
+
     const handleResize = () => {
       setIsSmallScreen(window.innerWidth < 768);
     };
@@ -25,18 +61,33 @@ const SignInPage = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Prevent back navigation
+  useEffect(() => {
+    const preventBack = () => {
+      window.history.forward();
+    };
+
+    window.history.pushState(null, '', window.location.href);
+    window.onpopstate = preventBack;
+    return () => {
+      window.onpopstate = null;
+    };
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
 
     try {
-      // Attempt to sign in
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
       
-      if (error) throw error;
+      if (signInError) throw signInError;
 
       if (data.user) {
-        // Fetch the user's role
         const { data: roleData, error: roleError } = await supabase
           .from('user_roles')
           .select('role')
@@ -45,26 +96,24 @@ const SignInPage = () => {
 
         if (roleError) throw roleError;
 
-        // Redirect based on role
+        // Replace current history entry with destination
         switch(roleData.role) {
           case 'student':
-            router.push('/studentdash');
+            router.replace('/studentdash');
             break;
           case 'teacher':
-            router.push('/teachdash');
+            router.replace('/teachdash');
             break;
           case 'admin':
-            router.push('/admindashboard'); // New redirection for admin
+            router.replace('/admindashboard');
             break;
           default:
-            console.error('Unknown user role');
-            await supabase.auth.signOut();
-            alert('Unknown user role. Please contact support.');
+            throw new Error('Unknown user role');
         }
       }
-    } catch (error) {
-      console.error('Error during sign in:', error);
-      alert('An error occurred during sign in. Please try again.');
+    } catch (err) {
+      console.error('Error during sign in:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred during sign in');
     } finally {
       setIsLoading(false);
     }
@@ -90,6 +139,11 @@ const SignInPage = () => {
             )}
             <div className="flex-1 w-full max-w-md">
               <h2 className="text-3xl font-bold text-center text-white mb-6">Sign In to Quizze</h2>
+              {error && (
+                <div className="mb-4 p-3 bg-red-500 bg-opacity-20 border border-red-500 rounded text-red-500">
+                  {error}
+                </div>
+              )}
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-white mb-1">
@@ -124,7 +178,7 @@ const SignInPage = () => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-200"
+                  className="w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? 'Signing In...' : 'Sign In'}
                 </button>

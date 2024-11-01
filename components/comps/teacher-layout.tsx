@@ -4,6 +4,7 @@ import TeacherSidebar from "./teachsidebar";
 import TeacherNavbar from "./teacher-navbar";
 import { MenuIcon, XIcon } from "@heroicons/react/outline";
 import { createClient as createClientComp } from "../../utils/supabase/component";
+import { useAuthProtection, handleLogout } from "../../utils/authProtection";
 
 interface TeacherLayoutProps {
   children: React.ReactNode;
@@ -19,6 +20,8 @@ const TeacherLayout: React.FC<TeacherLayoutProps> = ({ children }) => {
   const supabasecomp = createClientComp();
   const router = useRouter();
 
+  useAuthProtection();
+
   const activeItem = router.pathname.split('/')[1] || 'teachdash';
 
   useEffect(() => {
@@ -28,7 +31,11 @@ const TeacherLayout: React.FC<TeacherLayoutProps> = ({ children }) => {
       if (!mobile) {
         setIsSidebarOpen(false);
       }
+      
     };
+
+    
+
 
     handleResize();
     window.addEventListener("resize", handleResize);

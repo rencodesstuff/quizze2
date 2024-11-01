@@ -67,18 +67,23 @@ const CreateQuiz: React.FC = () => {
 
   return (
     <TeacherLayout>
-      <div className="min-h-screen bg-white py-12 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-white px-4 py-6 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="max-w-3xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200"
         >
-          <div className="px-8 py-6 bg-gradient-to-r from-blue-600 to-indigo-600">
-            <h1 className="text-3xl font-bold text-white">Create New Quiz</h1>
+          {/* Header */}
+          <div className="p-4 sm:p-6 bg-gradient-to-r from-blue-600 to-indigo-600">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              Create New Quiz
+            </h1>
           </div>
-          <form onSubmit={handleSubmit} className="px-8 py-6 space-y-6">
-            <div>
+
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6">
+            {/* Quiz Title */}
+            <div className="space-y-1">
               <label htmlFor="quizTitle" className="block text-sm font-medium text-gray-700">
                 Quiz Title
               </label>
@@ -87,46 +92,59 @@ const CreateQuiz: React.FC = () => {
                 id="quizTitle"
                 value={quizTitle}
                 onChange={(e) => setQuizTitle(e.target.value)}
-                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                 required
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Duration</label>
-                <div className="mt-1 flex rounded-md shadow-sm">
-                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
-                    <Clock className="h-5 w-5 text-gray-400" />
-                  </span>
-                  <input
-                    type="number"
-                    placeholder="Hours"
-                    value={duration.hours}
-                    onChange={(e) => setDuration({ ...duration, hours: e.target.value })}
-                    className="flex-1 min-w-0 block w-full px-3 py-2 rounded-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Minutes"
-                    value={duration.minutes}
-                    onChange={(e) => setDuration({ ...duration, minutes: e.target.value })}
-                    className="flex-1 min-w-0 block w-full px-3 py-2 rounded-r-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300"
-                  />
+            {/* Duration and Participants */}
+            <div className="space-y-6 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-4">
+              {/* Duration */}
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  Duration
+                </label>
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                  <div className="flex-1 relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Clock className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="number"
+                      placeholder="Hours"
+                      min="0"
+                      value={duration.hours}
+                      onChange={(e) => setDuration({ ...duration, hours: e.target.value })}
+                      className="block w-full pl-10 sm:text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="flex-1 relative rounded-md shadow-sm">
+                    <input
+                      type="number"
+                      placeholder="Minutes"
+                      min="0"
+                      max="59"
+                      value={duration.minutes}
+                      onChange={(e) => setDuration({ ...duration, minutes: e.target.value })}
+                      className="block w-full px-3 sm:text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
+              {/* Max Participants */}
+              <div className="space-y-1">
                 <label htmlFor="maxParticipants" className="block text-sm font-medium text-gray-700">
                   Max. Participants
                 </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Users className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     type="number"
                     id="maxParticipants"
+                    min="0"
                     value={maxParticipants}
                     onChange={(e) => setMaxParticipants(e.target.value)}
                     className="block w-full pl-10 sm:text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
@@ -136,12 +154,14 @@ const CreateQuiz: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
+            {/* Release Date and Time */}
+            <div className="space-y-6 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-4">
+              {/* Release Date */}
+              <div className="space-y-1">
                 <label htmlFor="releaseDate" className="block text-sm font-medium text-gray-700">
                   Release Date
                 </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="relative rounded-md shadow-sm">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Calendar className="h-5 w-5 text-gray-400" />
                   </div>
@@ -155,7 +175,8 @@ const CreateQuiz: React.FC = () => {
                 </div>
               </div>
 
-              <div>
+              {/* Release Time */}
+              <div className="space-y-1">
                 <label htmlFor="releaseTime" className="block text-sm font-medium text-gray-700">
                   Release Time
                 </label>
@@ -164,52 +185,67 @@ const CreateQuiz: React.FC = () => {
                   id="releaseTime"
                   value={releaseTime}
                   onChange={(e) => setReleaseTime(e.target.value)}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="block w-full sm:text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 sm:space-x-4">
+            {/* Quiz Settings */}
+            <div className="space-y-4 sm:space-y-0 sm:flex sm:items-center sm:justify-between border-t border-gray-200 pt-4">
+              {/* Strict Mode */}
               <div className="flex items-center">
                 <input
                   id="strictMode"
                   type="checkbox"
                   checked={strictMode}
                   onChange={(e) => setStrictMode(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
-                <label htmlFor="strictMode" className="ml-2 block text-sm text-gray-900">
-                  <ShieldCheck className="h-5 w-5 text-gray-400 inline mr-1" />
-                  Strict Mode
+                <label htmlFor="strictMode" className="ml-2 flex items-center text-sm text-gray-700">
+                  <ShieldCheck className="h-5 w-5 text-gray-400 mr-1" />
+                  <span className="hidden sm:inline">Strict Mode</span>
+                  <span className="sm:hidden">Strict</span>
                 </label>
               </div>
+
+              {/* Randomize Arrangement */}
               <div className="flex items-center">
                 <input
                   id="randomizeArrangement"
                   type="checkbox"
                   checked={randomizeArrangement}
                   onChange={(e) => setRandomizeArrangement(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
-                <label htmlFor="randomizeArrangement" className="ml-2 block text-sm text-gray-900">
-                  <Shuffle className="h-5 w-5 text-gray-400 inline mr-1" />
-                  Randomize Arrangement
+                <label htmlFor="randomizeArrangement" className="ml-2 flex items-center text-sm text-gray-700">
+                  <Shuffle className="h-5 w-5 text-gray-400 mr-1" />
+                  <span className="hidden sm:inline">Randomize Arrangement</span>
+                  <span className="sm:hidden">Randomize</span>
                 </label>
               </div>
             </div>
 
-            <div className="pt-5">
-              <div className="flex justify-end">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                >
-                  {isSubmitting ? 'Creating...' : 'Create Quiz and Add Questions'}
-                </motion.button>
-              </div>
+            {/* Submit Button */}
+            <div className="pt-4">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full sm:w-auto flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              >
+                {isSubmitting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Creating...
+                  </>
+                ) : (
+                  'Create Quiz and Add Questions'
+                )}
+              </motion.button>
             </div>
           </form>
         </motion.div>
