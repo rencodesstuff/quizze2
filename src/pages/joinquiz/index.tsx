@@ -1,4 +1,3 @@
-// pages/joinquiz/index.tsx
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import StudentLayout from "@/comps/student-layout";
@@ -24,7 +23,6 @@ const QRCodeScanner = dynamic(() => import('@/comps/QRCodeScanner'), {
 
 const JoinQuiz = () => {
   const router = useRouter();
-  const [quizCode, setQuizCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -36,6 +34,7 @@ const JoinQuiz = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const supabase = createClient();
 
+  // Fetch student information
   useEffect(() => {
     const fetchStudentInfo = async () => {
       try {
@@ -76,10 +75,10 @@ const JoinQuiz = () => {
     if (!/^[A-Z0-9]+$/.test(code)) throw new Error('Quiz code can only contain letters and numbers');
   };
 
-  const handleJoinQuiz = async () => {    
+  const handleJoinQuiz = async (code: string) => {    
     try {
       setIsJoiningQuiz(true);
-      validateQuizCode(quizCode);
+      validateQuizCode(code.toUpperCase());
 
       // Check authentication
       const { data: { session }, error: authError } = await supabase.auth.getSession();
@@ -93,7 +92,7 @@ const JoinQuiz = () => {
       const { data: quiz, error: quizError } = await supabase
         .from('quizzes')
         .select('id, title, max_participants, release_date')
-        .eq('code', quizCode.toUpperCase())
+        .eq('code', code.toUpperCase())
         .single();
 
       if (quizError || !quiz) {
@@ -167,28 +166,36 @@ const JoinQuiz = () => {
 
   const handleQRScan = async (scannedCode: string) => {
     try {
-      let code = scannedCode;
+      setIsJoiningQuiz(true);
+      let code = scannedCode.trim();
       
       // Try to extract code from URL
       try {
-        const url = new URL(scannedCode);
-        const urlCode = url.searchParams.get('code');
-        if (urlCode) code = urlCode;
-      } catch {
-        // Use the scanned code as-is
+        if (code.includes('http')) {
+          const url = new URL(scannedCode);
+          const urlCode = url.searchParams.get('code');
+          if (urlCode) {
+            code = urlCode.trim();
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing URL:', error);
       }
 
+      // Validate code format
       if (!code || code.length !== 6) {
-        throw new Error('Invalid QR code format');
+        throw new Error('Invalid QR code format. Code must be 6 characters long.');
       }
 
-      setQuizCode(code.toUpperCase());
+      await handleJoinQuiz(code);
       setShowScanner(false);
-      await handleJoinQuiz();
+
     } catch (error) {
       console.error('Error processing QR code:', error);
       setErrorMessage(error instanceof Error ? error.message : 'Invalid QR code');
       setShowErrorModal(true);
+    } finally {
+      setIsJoiningQuiz(false);
     }
   };
 
