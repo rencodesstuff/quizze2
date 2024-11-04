@@ -1,7 +1,7 @@
 // components/QRCodeScanner.tsx
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { X, Camera } from 'lucide-react';
+import { X, Camera, Loader } from 'lucide-react';
 
 interface QRCodeScannerProps {
   onScan: (code: string) => void;
@@ -10,59 +10,68 @@ interface QRCodeScannerProps {
 
 const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan, onClose }) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Create instance
-    scannerRef.current = new Html5Qrcode("qr-reader");
+    setIsLoading(true);
 
-    // Start scanning
-    scannerRef.current
-      .start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: {
-            width: Math.min(250, window.innerWidth - 50),
-            height: Math.min(250, window.innerWidth - 50)
-          },
-          aspectRatio: 1.0,
-        },
-        (decodedText) => {
-          // Success callback
-          try {
-            // Try to parse as URL first
-            const url = new URL(decodedText);
-            const code = url.searchParams.get('code');
-            if (code) {
-              onScan(code);
-            } else {
-              // If not URL, use the raw text
-              onScan(decodedText);
-            }
-          } catch {
-            // If not a URL, use the raw text
-            onScan(decodedText);
-          }
-          
-          // Stop scanning after successful scan
-          if (scannerRef.current) {
-            scannerRef.current.stop()
-              .then(() => {
-                console.log('Scanner stopped');
-              })
-              .catch(err => {
-                console.error('Error stopping scanner:', err);
-              });
-          }
-        },
-        (errorMessage) => {
-          // Error callback
-          console.log(errorMessage);
-        }
-      )
+    // Check for camera permission
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(() => {
+        setCameraPermission(true);
+        initializeScanner();
+      })
       .catch((err) => {
-        console.error("Error starting scanner:", err);
+        console.error('Camera permission denied:', err);
+        setCameraPermission(false);
+        setError('Camera access denied. Please allow camera access to scan QR codes.');
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
+
+    // Initialize scanner function
+    const initializeScanner = () => {
+      try {
+        scannerRef.current = new Html5Qrcode("qr-reader");
+
+        // Calculate responsive QR box size
+        const screenWidth = window.innerWidth;
+        const qrboxSize = Math.min(
+          250,
+          screenWidth < 768 ? screenWidth - 70 : screenWidth * 0.3
+        );
+
+        scannerRef.current
+          .start(
+            { facingMode: "environment" },
+            {
+              fps: 10,
+              qrbox: {
+                width: qrboxSize,
+                height: qrboxSize
+              },
+              aspectRatio: 1.0,
+            },
+            (decodedText) => {
+              handleSuccessfulScan(decodedText);
+            },
+            (errorMessage) => {
+              // Only log scanning errors, don't show to user
+              console.log('Scanning:', errorMessage);
+            }
+          )
+          .catch((err) => {
+            console.error("Error starting scanner:", err);
+            setError('Failed to start camera. Please try again.');
+          });
+      } catch (err) {
+        console.error("Scanner initialization error:", err);
+        setError('Failed to initialize scanner. Please refresh and try again.');
+      }
+    };
 
     // Cleanup function
     return () => {
@@ -79,6 +88,41 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan, onClose }) => {
     };
   }, [onScan]);
 
+  const handleSuccessfulScan = async (decodedText: string) => {
+    try {
+      // Try to parse as URL first
+      const url = new URL(decodedText);
+      const code = url.searchParams.get('code');
+      
+      // Stop scanner first to prevent multiple scans
+      if (scannerRef.current) {
+        await scannerRef.current.stop();
+      }
+
+      // Process the code
+      if (code) {
+        onScan(code);
+      } else {
+        onScan(decodedText);
+      }
+    } catch {
+      // If not a URL, use the raw text
+      if (scannerRef.current) {
+        await scannerRef.current.stop();
+      }
+      onScan(decodedText);
+    }
+  };
+
+  const handleRetry = () => {
+    setError(null);
+    setIsLoading(true);
+    if (scannerRef.current) {
+      scannerRef.current.clear();
+    }
+    window.location.reload(); // Refresh to retry camera access
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg w-full max-w-md overflow-hidden">
@@ -90,23 +134,42 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan, onClose }) => {
           </div>
           <button 
             onClick={onClose}
-            className="text-white hover:text-gray-200 p-1"
+            className="text-white hover:text-gray-200 p-1 transition-colors"
             aria-label="Close scanner"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
         
-        {/* Scanner */}
+        {/* Scanner Content */}
         <div className="p-4">
-          <div 
-            id="qr-reader" 
-            className="w-full aspect-square overflow-hidden rounded-lg bg-gray-100"
-          ></div>
-          
-          <div className="text-sm text-gray-600 text-center mt-4">
-            Position the QR code within the frame to scan
-          </div>
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center h-64">
+              <Loader className="w-8 h-8 animate-spin text-blue-600" />
+              <p className="mt-4 text-gray-600">Initializing camera...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <div className="text-red-600 mb-4">{error}</div>
+              <button
+                onClick={handleRetry}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          ) : (
+            <>
+              <div 
+                id="qr-reader" 
+                className="w-full aspect-square overflow-hidden rounded-lg bg-gray-100"
+              ></div>
+              
+              <div className="text-sm text-gray-600 text-center mt-4">
+                Position the QR code within the frame to scan
+              </div>
+            </>
+          )}
           
           <button
             onClick={onClose}
