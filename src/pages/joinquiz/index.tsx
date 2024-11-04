@@ -1,3 +1,4 @@
+// pages/joinquiz/index.tsx
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import StudentLayout from "@/comps/student-layout";
@@ -199,6 +200,36 @@ const JoinQuiz = () => {
     }
   };
 
+  const handleOpenScanner = async () => {
+    try {
+      // Check if running in iOS Safari
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+      if (isIOS && isSafari) {
+        // Show instructions for iOS users
+        setErrorMessage(
+          'For iOS devices:\n\n' +
+          '1. Allow camera access when prompted\n\n' +
+          '2. If no prompt appears, please:\n' +
+          '   • Go to Settings\n' +
+          '   • Find Safari\n' +
+          '   • Enable camera access\n\n' +
+          '3. Then try again'
+        );
+        setShowErrorModal(true);
+        // Show scanner after instructions
+        setTimeout(() => setShowScanner(true), 3000);
+      } else {
+        setShowScanner(true);
+      }
+    } catch (error) {
+      console.error('Error opening scanner:', error);
+      setErrorMessage('Failed to open camera. Please check camera permissions.');
+      setShowErrorModal(true);
+    }
+  };
+
   if (isLoadingStudent) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
@@ -226,7 +257,7 @@ const JoinQuiz = () => {
               />
               
               <button
-                onClick={() => setShowScanner(true)}
+                onClick={handleOpenScanner}
                 disabled={isJoiningQuiz}
                 className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >

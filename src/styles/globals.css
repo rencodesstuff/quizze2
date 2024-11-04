@@ -76,3 +76,7 @@ body {
 #qr-reader__scan_region > img {
   display: none !important;
 }
+
+#qr-reader * {
+  border: none !important;
+}
