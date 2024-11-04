@@ -3,10 +3,12 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import StudentLayout from "@/comps/student-layout";
 import { Card, Title, Text } from "@tremor/react";
-import { Camera } from "lucide-react";
+import { Camera, Clock, Calendar, CheckCircle } from "lucide-react";
 import Modal from "@/comps/Modal";
 import dynamic from 'next/dynamic';
 import JoinQuizForm from '@/comps/JoinQuizForm';
+import QuizCard from '@/comps/QuizCard';
+import TabComponent from '@/comps/TabComponent';
 import { useQuizzes } from "../../hooks/useQuizzes";
 import { useStudentInfo } from "../../hooks/useStudentInfo";
 
@@ -23,15 +25,25 @@ const QRCodeScanner = dynamic(() => import('@/comps/QRCodeScanner'), {
   ),
 });
 
+interface Quiz {
+  id: string;
+  title: string;
+  duration_minutes: number | null;
+  release_date: string | null;
+  code: string | null;
+  created_at: string;
+}
+
 const StudentQuizzes = () => {
   const router = useRouter();
   const { studentName, studentId, loading: studentLoading } = useStudentInfo();
-  const { joinQuiz } = useQuizzes();
+  const { activeQuizzes, upcomingQuizzes, completedQuizzes, joinQuiz } = useQuizzes();
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showScanner, setShowScanner] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Check if device is mobile
   useEffect(() => {
@@ -47,6 +59,13 @@ const StudentQuizzes = () => {
     
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  useEffect(() => {
+    // Set loading to false once we have the data
+    if (activeQuizzes || upcomingQuizzes || completedQuizzes) {
+      setIsLoading(false);
+    }
+  }, [activeQuizzes, upcomingQuizzes, completedQuizzes]);
 
   const handleJoinQuiz = async (quizCode: string) => {
     setIsJoining(true);
@@ -82,17 +101,40 @@ const StudentQuizzes = () => {
     }
   };
 
-  if (studentLoading) {
+  const tabs = [
+    { 
+      name: "Active Quizzes", 
+      icon: Clock, 
+      content: activeQuizzes || [],
+      description: "Currently available quizzes ready to take"
+    },
+    { 
+      name: "Upcoming Quizzes", 
+      icon: Calendar, 
+      content: upcomingQuizzes || [],
+      description: "Scheduled quizzes that will be available soon"
+    },
+    { 
+      name: "Completed Quizzes", 
+      icon: CheckCircle, 
+      content: completedQuizzes || [],
+      description: "Quizzes you have already taken"
+    },
+  ];
+
+  if (studentLoading || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
+      <StudentLayout studentName="" studentId="">
+        <div className="flex justify-center items-center h-screen">
+          <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      </StudentLayout>
     );
   }
 
   return (
     <StudentLayout studentName={studentName} studentId={studentId}>
-      <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto">
         <div className="mb-6">
           <Title className="text-2xl sm:text-3xl font-bold text-gray-800">Student Quizzes</Title>
           <Text className="text-gray-600">Join and view your quizzes</Text>
@@ -123,6 +165,34 @@ const StudentQuizzes = () => {
               )}
             </div>
           </div>
+        </Card>
+
+        {/* Quiz Lists */}
+        <Card className="flex-grow flex flex-col overflow-hidden">
+          <TabComponent 
+            tabs={tabs} 
+            renderContent={(content, activeTab) => (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 p-4">
+                {content.map((quiz: Quiz) => (
+                  <QuizCard 
+                    key={quiz.id} 
+                    quiz={quiz} 
+                    status={tabs[activeTab].name.split(' ')[0].toLowerCase() as "active" | "upcoming" | "completed"} 
+                  />
+                ))}
+                {content.length === 0 && (
+                  <div className="col-span-full text-center py-8">
+                    <Text className="text-gray-500">
+                      No {tabs[activeTab].name.toLowerCase()} at the moment.
+                    </Text>
+                    <Text className="text-sm text-gray-400 mt-2">
+                      {tabs[activeTab].description}
+                    </Text>
+                  </div>
+                )}
+              </div>
+            )} 
+          />
         </Card>
 
         {/* Error Modal */}
