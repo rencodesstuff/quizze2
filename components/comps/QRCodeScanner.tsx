@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
-import { X, Camera, RefreshCcw } from 'lucide-react';
+import React, { useEffect, useRef, useState } from "react";
+import { Html5Qrcode } from "html5-qrcode";
+import { X, Camera, RefreshCcw } from "lucide-react";
 
 interface QRCodeScannerProps {
   onScan: (code: string) => void;
@@ -12,22 +12,31 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan, onClose }) => {
   const [isInitializing, setIsInitializing] = useState(true);
   const scannerRef = useRef<Html5Qrcode | null>(null);
 
-  const checkIOSPermission = async () => {
-    if (/iPad|iPhone|iPod/.test(navigator.userAgent) && 'mediaDevices' in navigator) {
+  const requestIOSPermissions = async () => {
+    try {
+      // Request permission explicitly
+      const permissionResult = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { exact: "environment" }, // Try to use back camera first
+        },
+      });
+
+      // Stop the stream immediately after getting permission
+      permissionResult.getTracks().forEach((track) => track.stop());
+      return true;
+    } catch (err) {
+      // If back camera fails, try any camera
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'environment'
-          }
+        const fallbackResult = await navigator.mediaDevices.getUserMedia({
+          video: true,
         });
-        stream.getTracks().forEach(track => track.stop());
+        fallbackResult.getTracks().forEach((track) => track.stop());
         return true;
-      } catch (err) {
-        console.error('iOS Camera permission error:', err);
+      } catch (fallbackErr) {
+        console.error("Camera permission error:", fallbackErr);
         return false;
       }
     }
-    return true;
   };
 
   const initializeScanner = async () => {
@@ -35,12 +44,21 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan, onClose }) => {
       setIsInitializing(true);
       setError(null);
 
-      const hasPermission = await checkIOSPermission();
-      if (!hasPermission) {
-        throw new Error(
-          'Camera access denied. Please allow camera access in your device settings:\n' +
-          'Settings > Safari > Camera > Allow'
-        );
+      // For iOS devices
+      if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+        const hasPermission = await requestIOSPermissions();
+        if (!hasPermission) {
+          throw new Error(
+            "Camera access denied.\n\n" +
+              "To enable camera access:\n" +
+              "1. Close this window\n" +
+              "2. Go to iOS Settings\n" +
+              "3. Find Safari settings\n" +
+              '4. Select "Camera"\n' +
+              '5. Choose "Allow"\n' +
+              "6. Return and try again"
+          );
+        }
       }
 
       if (scannerRef.current) {
@@ -48,25 +66,21 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan, onClose }) => {
         await scannerRef.current.clear();
       }
 
-      scannerRef.current = new Html5Qrcode(
-        "qr-reader",
-        { 
-          verbose: false
-        }
-      );
-
-      const config = {
-        fps: 10,
-        qrbox: {
-          width: Math.min(250, window.innerWidth - 50),
-          height: Math.min(250, window.innerWidth - 50)
-        },
-        aspectRatio: 1.0,
-      };
+      scannerRef.current = new Html5Qrcode("qr-reader");
 
       await scannerRef.current.start(
         { facingMode: "environment" },
-        config,
+        {
+          fps: 10,
+          qrbox: {
+            width: Math.min(250, window.innerWidth - 50),
+            height: Math.min(250, window.innerWidth - 50),
+          },
+          aspectRatio: 1.0,
+          videoConstraints: {
+            facingMode: { ideal: "environment" },
+          },
+        },
         async (decodedText) => {
           try {
             if (scannerRef.current) {
@@ -74,19 +88,37 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan, onClose }) => {
             }
             onScan(decodedText);
           } catch (error) {
-            console.error('Error processing scan:', error);
-            setError('Failed to process QR code. Please try again.');
+            console.error("Error processing scan:", error);
+            setError("Failed to process QR code. Please try again.");
           }
         },
-        () => {} // Empty error handler to prevent console spam
+        undefined
       );
-
     } catch (err) {
-      console.error('Scanner initialization error:', err);
-      if (err instanceof Error && err.message.includes('Camera access denied')) {
-        setError(err.message);
+      console.error("Scanner initialization error:", err);
+      if (err instanceof Error) {
+        if (err.message.includes("Camera access denied")) {
+          setError(err.message);
+        } else if (err.message.includes("NotAllowedError")) {
+          setError(
+            "Camera access denied.\n\n" +
+              "To enable camera access:\n" +
+              "1. Close this window\n" +
+              "2. Go to iOS Settings\n" +
+              "3. Find Safari settings\n" +
+              '4. Select "Camera"\n' +
+              '5. Choose "Allow"\n' +
+              "6. Return and try again"
+          );
+        } else {
+          setError(
+            "Failed to initialize camera. Please check camera permissions and try again."
+          );
+        }
       } else {
-        setError('Failed to initialize camera. Please check camera permissions and try again.');
+        setError(
+          "Failed to initialize camera. Please check camera permissions and try again."
+        );
       }
     } finally {
       setIsInitializing(false);
@@ -104,7 +136,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan, onClose }) => {
             await scannerRef.current.clear();
           }
         } catch (err) {
-          console.error('Cleanup error:', err);
+          console.error("Cleanup error:", err);
         }
       };
       cleanup();
