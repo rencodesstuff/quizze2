@@ -1,25 +1,21 @@
 // components/JoinQuizForm.tsx
-import React from "react";
-import { Title } from "@tremor/react";
+import React, { useState } from "react";
 
 interface JoinQuizFormProps {
-  quizCode: string;
-  onQuizCodeChange: (code: string) => void;
-  onSubmit?: (e: React.FormEvent) => void;
+  onSubmit: (quizCode: string) => Promise<void>;
   isLoading?: boolean;
 }
 
 const JoinQuizForm: React.FC<JoinQuizFormProps> = ({ 
-  quizCode, 
-  onQuizCodeChange,
   onSubmit,
   isLoading = false 
 }) => {
-  const handleSubmit = (e: React.FormEvent) => {
+  const [quizCode, setQuizCode] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (onSubmit) {
-      onSubmit(e);
-    }
+    await onSubmit(quizCode);
+    setQuizCode("");
   };
 
   return (
@@ -31,7 +27,7 @@ const JoinQuizForm: React.FC<JoinQuizFormProps> = ({
             placeholder="Enter 6-digit quiz code"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             value={quizCode}
-            onChange={(e) => onQuizCodeChange(e.target.value.toUpperCase())}
+            onChange={(e) => setQuizCode(e.target.value.toUpperCase())}
             maxLength={6}
             required
             disabled={isLoading}

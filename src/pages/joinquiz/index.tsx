@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import StudentLayout from "@/comps/student-layout";
 import { createClient } from '../../../utils/supabase/component';
-import { Camera } from "lucide-react";
-import { Card } from "@tremor/react";
+import { Camera, Loader } from "lucide-react";
+import { Card, Title, Text } from "@tremor/react";
 import Modal from "@/comps/Modal";
 import dynamic from 'next/dynamic';
 import JoinQuizForm from '@/comps/JoinQuizForm';
@@ -31,15 +31,18 @@ const JoinQuiz = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [studentInfo, setStudentInfo] = useState({ name: '', studentId: '' });
   const [isLoadingStudent, setIsLoadingStudent] = useState(true);
+  const [isJoiningQuiz, setIsJoiningQuiz] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const supabase = createClient();
 
-  // Fetch student information
   useEffect(() => {
     const fetchStudentInfo = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
-          router.push('/signin');
+          const currentUrl = encodeURIComponent(window.location.pathname);
+          router.push(`/signin?redirect=${currentUrl}`);
           return;
         }
 
@@ -57,7 +60,7 @@ const JoinQuiz = () => {
         });
       } catch (error) {
         console.error('Error fetching student info:', error);
-        setErrorMessage('Failed to load student information');
+        setErrorMessage('Failed to load student information. Please try again or contact support.');
         setShowErrorModal(true);
       } finally {
         setIsLoadingStudent(false);
@@ -67,21 +70,22 @@ const JoinQuiz = () => {
     fetchStudentInfo();
   }, []);
 
+  const validateQuizCode = (code: string) => {
+    if (!code) throw new Error('Please enter a quiz code');
+    if (code.length !== 6) throw new Error('Quiz code must be 6 characters long');
+    if (!/^[A-Z0-9]+$/.test(code)) throw new Error('Quiz code can only contain letters and numbers');
+  };
+
   const handleJoinQuiz = async () => {    
-    if (!quizCode.trim()) {
-      setErrorMessage('Please enter a quiz code');
-      setShowErrorModal(true);
-      return;
-    }
-
-    setIsLoading(true);
-
     try {
-      // Get current user
+      setIsJoiningQuiz(true);
+      validateQuizCode(quizCode);
+
+      // Check authentication
       const { data: { session }, error: authError } = await supabase.auth.getSession();
-      if (authError) throw new Error('Authentication error');
-      if (!session) {
-        router.push(`/signin?redirect=/joinquiz?code=${quizCode}`);
+      if (authError || !session) {
+        const currentUrl = encodeURIComponent(window.location.pathname);
+        router.push(`/signin?redirect=${currentUrl}`);
         return;
       }
 
@@ -92,22 +96,21 @@ const JoinQuiz = () => {
         .eq('code', quizCode.toUpperCase())
         .single();
 
-      if (quizError) {
+      if (quizError || !quiz) {
         throw new Error('Invalid quiz code or quiz not found');
       }
 
-      // Check if quiz exists
-      if (!quiz) {
-        throw new Error('Quiz not found');
-      }
-
       // Check release date
-      if (quiz.release_date && new Date(quiz.release_date) > new Date()) {
-        throw new Error(`This quiz is not available yet. It will be released on ${new Date(quiz.release_date).toLocaleString()}`);
+      if (quiz.release_date) {
+        const releaseDate = new Date(quiz.release_date);
+        const now = new Date();
+        if (releaseDate > now) {
+          throw new Error(`This quiz is not available yet. It will be released on ${releaseDate.toLocaleString()}`);
+        }
       }
 
-      // Check if student already joined
-      const { data: existingJoin, error: joinCheckError } = await supabase
+      // Check if already joined
+      const { data: existingJoin } = await supabase
         .from('student_quizzes')
         .select('id')
         .eq('student_id', session.user.id)
@@ -115,11 +118,15 @@ const JoinQuiz = () => {
         .single();
 
       if (existingJoin) {
-        router.push(`/stdquiz/${quiz.id}`);
+        setSuccessMessage('You have already joined this quiz. Redirecting to quiz page...');
+        setShowSuccessModal(true);
+        setTimeout(() => {
+          router.push(`/stdquiz/${quiz.id}`);
+        }, 2000);
         return;
       }
 
-      // Check maximum participants if set
+      // Check participant limit
       if (quiz.max_participants) {
         const { count, error: countError } = await supabase
           .from('student_quizzes')
@@ -133,7 +140,7 @@ const JoinQuiz = () => {
         }
       }
 
-      // Join the quiz
+      // Join quiz
       const { error: joinError } = await supabase
         .from('student_quizzes')
         .insert([{
@@ -141,48 +148,55 @@ const JoinQuiz = () => {
           quiz_id: quiz.id
         }]);
 
-      if (joinError) {
-        throw new Error('Failed to join quiz');
-      }
+      if (joinError) throw joinError;
 
-      // Redirect to quiz
-      router.push(`/stdquiz/${quiz.id}`);
+      setSuccessMessage('Successfully joined quiz! Redirecting...');
+      setShowSuccessModal(true);
+      setTimeout(() => {
+        router.push(`/stdquiz/${quiz.id}`);
+      }, 1500);
 
     } catch (error) {
       console.error('Error joining quiz:', error);
       setErrorMessage(error instanceof Error ? error.message : 'An unexpected error occurred');
       setShowErrorModal(true);
     } finally {
-      setIsLoading(false);
+      setIsJoiningQuiz(false);
     }
   };
 
   const handleQRScan = async (scannedCode: string) => {
     try {
       let code = scannedCode;
-      // Try to extract code from URL if it's a URL
+      
+      // Try to extract code from URL
       try {
         const url = new URL(scannedCode);
         const urlCode = url.searchParams.get('code');
         if (urlCode) code = urlCode;
       } catch {
-        // If not a URL, use the code as-is
+        // Use the scanned code as-is
       }
 
-      setQuizCode(code);
+      if (!code || code.length !== 6) {
+        throw new Error('Invalid QR code format');
+      }
+
+      setQuizCode(code.toUpperCase());
       setShowScanner(false);
       await handleJoinQuiz();
     } catch (error) {
       console.error('Error processing QR code:', error);
-      setErrorMessage('Invalid QR code');
+      setErrorMessage(error instanceof Error ? error.message : 'Invalid QR code');
       setShowErrorModal(true);
     }
   };
 
   if (isLoadingStudent) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+        <p className="mt-4 text-gray-600">Loading student information...</p>
       </div>
     );
   }
@@ -190,24 +204,36 @@ const JoinQuiz = () => {
   return (
     <StudentLayout studentName={studentInfo.name} studentId={studentInfo.studentId}>
       <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+        <div className="mb-6">
+          <Title className="text-2xl sm:text-3xl font-bold text-gray-800">Join Quiz</Title>
+          <Text className="text-gray-600 mt-2">Enter a quiz code or scan a QR code to join</Text>
+        </div>
+
         {/* Join Quiz Section */}
         <Card className="mb-6">
           <div className="p-4">
-            <h3 className="text-xl font-bold mb-4">Join a New Quiz</h3>
             <div className="flex flex-col gap-4">
               <JoinQuizForm 
-                quizCode={quizCode}
-                onQuizCodeChange={setQuizCode}
                 onSubmit={handleJoinQuiz}
-                isLoading={isLoading}
+                isLoading={isJoiningQuiz}
               />
               
               <button
                 onClick={() => setShowScanner(true)}
-                className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                disabled={isJoiningQuiz}
+                className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Camera className="w-5 h-5 mr-2" />
-                Scan QR Code
+                {isJoiningQuiz ? (
+                  <>
+                    <Loader className="w-5 h-5 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Camera className="w-5 h-5 mr-2" />
+                    Scan QR Code
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -220,6 +246,14 @@ const JoinQuiz = () => {
           title="Error"
           message={errorMessage}
           isError
+        />
+
+        {/* Success Modal */}
+        <Modal
+          isOpen={showSuccessModal}
+          onClose={() => setShowSuccessModal(false)}
+          title="Success"
+          message={successMessage}
         />
 
         {/* QR Scanner */}
