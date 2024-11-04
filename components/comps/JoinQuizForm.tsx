@@ -1,36 +1,52 @@
-import React, { useState } from "react";
+// components/JoinQuizForm.tsx
+import React from "react";
 import { Title } from "@tremor/react";
 
 interface JoinQuizFormProps {
-  onJoinQuiz: (quizCode: string) => void;
+  quizCode: string;
+  onQuizCodeChange: (code: string) => void;
+  onSubmit?: (e: React.FormEvent) => void;
+  isLoading?: boolean;
 }
 
-const JoinQuizForm: React.FC<JoinQuizFormProps> = ({ onJoinQuiz }) => {
-  const [quizCode, setQuizCode] = useState("");
-
+const JoinQuizForm: React.FC<JoinQuizFormProps> = ({ 
+  quizCode, 
+  onQuizCodeChange,
+  onSubmit,
+  isLoading = false 
+}) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onJoinQuiz(quizCode);
-    setQuizCode("");
+    if (onSubmit) {
+      onSubmit(e);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <Title className="text-xl font-semibold mb-4">Join a New Quiz</Title>
-      <div className="flex items-center space-x-4">
-        <input
-          type="text"
-          placeholder="Enter quiz code"
-          className="flex-grow p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          value={quizCode}
-          onChange={(e) => setQuizCode(e.target.value)}
-          required
-        />
+    <form onSubmit={handleSubmit} className="w-full">
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex-grow">
+          <input
+            type="text"
+            placeholder="Enter 6-digit quiz code"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            value={quizCode}
+            onChange={(e) => onQuizCodeChange(e.target.value.toUpperCase())}
+            maxLength={6}
+            required
+            disabled={isLoading}
+          />
+        </div>
         <button 
           type="submit"
-          className="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+          disabled={isLoading || !quizCode.trim()}
+          className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[100px] h-[40px] flex items-center justify-center"
         >
-          Join Quiz
+          {isLoading ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+          ) : (
+            'Join Quiz'
+          )}
         </button>
       </div>
     </form>

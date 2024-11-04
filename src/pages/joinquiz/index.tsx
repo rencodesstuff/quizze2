@@ -1,10 +1,13 @@
+// pages/joinquiz/index.tsx
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import Link from 'next/link';
 import StudentLayout from "@/comps/student-layout";
 import { createClient } from '../../../utils/supabase/component';
+import { Camera } from "lucide-react";
+import { Card } from "@tremor/react";
 import Modal from "@/comps/Modal";
 import dynamic from 'next/dynamic';
+import JoinQuizForm from '@/comps/JoinQuizForm';
 
 // Dynamically import QR Scanner
 const QRCodeScanner = dynamic(() => import('@/comps/QRCodeScanner'), {
@@ -21,8 +24,6 @@ const QRCodeScanner = dynamic(() => import('@/comps/QRCodeScanner'), {
 
 const JoinQuiz = () => {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('code');
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [quizCode, setQuizCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -66,9 +67,7 @@ const JoinQuiz = () => {
     fetchStudentInfo();
   }, []);
 
-  const handleJoinQuiz = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    
+  const handleJoinQuiz = async () => {    
     if (!quizCode.trim()) {
       setErrorMessage('Please enter a quiz code');
       setShowErrorModal(true);
@@ -190,95 +189,29 @@ const JoinQuiz = () => {
 
   return (
     <StudentLayout studentName={studentInfo.name} studentId={studentInfo.studentId}>
-      <div className="flex-1 flex flex-col p-4">
-        {/* Join Quiz Content */}
-        <div className="flex-1 flex items-center justify-center">
-          <div className="max-w-md w-full space-y-8 bg-white p-6 sm:p-10 rounded-xl shadow-lg">
-            <div className="text-center">
-              <h2 className="text-3xl font-extrabold text-gray-900">Join a Quiz</h2>
-              <p className="mt-2 text-sm text-gray-600">Enter a code or scan a QR code to join</p>
-            </div>
-
-            <div className="flex justify-center space-x-4 mt-6">
+      <div className="p-4 sm:p-6 max-w-4xl mx-auto">
+        {/* Join Quiz Section */}
+        <Card className="mb-6">
+          <div className="p-4">
+            <h3 className="text-xl font-bold mb-4">Join a New Quiz</h3>
+            <div className="flex flex-col gap-4">
+              <JoinQuizForm 
+                quizCode={quizCode}
+                onQuizCodeChange={setQuizCode}
+                onSubmit={handleJoinQuiz}
+                isLoading={isLoading}
+              />
+              
               <button
-                onClick={() => {
-                  setActiveTab('code');
-                  setShowScanner(false);
-                }}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
-                  activeTab === 'code'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                onClick={() => setShowScanner(true)}
+                className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
               >
-                Enter Code
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab('qr');
-                  setShowScanner(true);
-                }}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
-                  activeTab === 'qr'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
+                <Camera className="w-5 h-5 mr-2" />
                 Scan QR Code
               </button>
             </div>
-
-            {activeTab === 'code' ? (
-              <form className="mt-8 space-y-6" onSubmit={handleJoinQuiz}>
-                <div className="rounded-md shadow-sm -space-y-px">
-                  <div>
-                    <label htmlFor="quiz-code" className="sr-only">Quiz Code</label>
-                    <input 
-                      id="quiz-code" 
-                      value={quizCode}
-                      onChange={(e) => setQuizCode(e.target.value.toUpperCase())}
-                      type="text" 
-                      required 
-                      maxLength={6}
-                      className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" 
-                      placeholder="Enter 6-digit Quiz Code" 
-                    />
-                  </div>
-                </div>
-                <button 
-                  type="submit" 
-                  disabled={isLoading}
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? (
-                    <div className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                      Joining...
-                    </div>
-                  ) : (
-                    'Join Quiz'
-                  )}
-                </button>
-              </form>
-            ) : (
-              <div className="mt-8 space-y-6">
-                {showScanner ? (
-                  <QRCodeScanner
-                    onScan={handleQRScan}
-                    onClose={() => {
-                      setShowScanner(false);
-                      setActiveTab('code');
-                    }}
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-64 bg-gray-100 rounded-lg">
-                    <p className="text-gray-500">Camera access required for QR scanning</p>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
-        </div>
+        </Card>
 
         {/* Error Modal */}
         <Modal
@@ -288,6 +221,14 @@ const JoinQuiz = () => {
           message={errorMessage}
           isError
         />
+
+        {/* QR Scanner */}
+        {showScanner && (
+          <QRCodeScanner
+            onScan={handleQRScan}
+            onClose={() => setShowScanner(false)}
+          />
+        )}
       </div>
     </StudentLayout>
   );

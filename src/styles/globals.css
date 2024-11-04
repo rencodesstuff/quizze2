@@ -46,19 +46,16 @@ body {
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
 }
 
-#qr-reader video {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-}
-
+/* styles/globals.css */
 #qr-reader {
   border: none !important;
   width: 100% !important;
 }
 
-#qr-reader__scan_region {
-  min-height: unset !important;
+#qr-reader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
 }
 
 #qr-reader__dashboard {
@@ -67,4 +64,12 @@ body {
 
 #qr-reader__status_span {
   display: none !important;
+}
+
+#qr-reader__camera_selection {
+  display: none !important;
+}
+
+#qr-reader__scan_region {
+  min-height: unset !important;
 }
