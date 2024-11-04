@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
-import { X, Camera, RefreshCcw } from "lucide-react";
+// components/comps/QRCodeScanner.tsx
+import React, { useEffect, useRef, useState } from 'react';
+import QrScanner from 'qr-scanner';
+import { X, Camera, RefreshCcw } from 'lucide-react';
 
 interface QRCodeScannerProps {
   onScan: (code: string) => void;
@@ -10,141 +11,107 @@ interface QRCodeScannerProps {
 const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan, onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const scannerRef = useRef<QrScanner | null>(null);
 
-  const requestIOSPermissions = async () => {
-    try {
-      // Request permission explicitly
-      const permissionResult = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { exact: "environment" }, // Try to use back camera first
-        },
-      });
-
-      // Stop the stream immediately after getting permission
-      permissionResult.getTracks().forEach((track) => track.stop());
-      return true;
-    } catch (err) {
-      // If back camera fails, try any camera
+  const checkIOSPermission = async () => {
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent) && 'mediaDevices' in navigator) {
       try {
-        const fallbackResult = await navigator.mediaDevices.getUserMedia({
-          video: true,
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'environment'
+          }
         });
-        fallbackResult.getTracks().forEach((track) => track.stop());
+        stream.getTracks().forEach(track => track.stop());
         return true;
-      } catch (fallbackErr) {
-        console.error("Camera permission error:", fallbackErr);
+      } catch (err) {
+        console.error('iOS Camera permission error:', err);
         return false;
       }
     }
-  };
-
-  const initializeScanner = async () => {
-    try {
-      setIsInitializing(true);
-      setError(null);
-
-      // For iOS devices
-      if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-        const hasPermission = await requestIOSPermissions();
-        if (!hasPermission) {
-          throw new Error(
-            "Camera access denied.\n\n" +
-              "To enable camera access:\n" +
-              "1. Close this window\n" +
-              "2. Go to iOS Settings\n" +
-              "3. Find Safari settings\n" +
-              '4. Select "Camera"\n' +
-              '5. Choose "Allow"\n' +
-              "6. Return and try again"
-          );
-        }
-      }
-
-      if (scannerRef.current) {
-        await scannerRef.current.stop();
-        await scannerRef.current.clear();
-      }
-
-      scannerRef.current = new Html5Qrcode("qr-reader");
-
-      await scannerRef.current.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: {
-            width: Math.min(250, window.innerWidth - 50),
-            height: Math.min(250, window.innerWidth - 50),
-          },
-          aspectRatio: 1.0,
-          videoConstraints: {
-            facingMode: { ideal: "environment" },
-          },
-        },
-        async (decodedText) => {
-          try {
-            if (scannerRef.current) {
-              await scannerRef.current.stop();
-            }
-            onScan(decodedText);
-          } catch (error) {
-            console.error("Error processing scan:", error);
-            setError("Failed to process QR code. Please try again.");
-          }
-        },
-        undefined
-      );
-    } catch (err) {
-      console.error("Scanner initialization error:", err);
-      if (err instanceof Error) {
-        if (err.message.includes("Camera access denied")) {
-          setError(err.message);
-        } else if (err.message.includes("NotAllowedError")) {
-          setError(
-            "Camera access denied.\n\n" +
-              "To enable camera access:\n" +
-              "1. Close this window\n" +
-              "2. Go to iOS Settings\n" +
-              "3. Find Safari settings\n" +
-              '4. Select "Camera"\n' +
-              '5. Choose "Allow"\n' +
-              "6. Return and try again"
-          );
-        } else {
-          setError(
-            "Failed to initialize camera. Please check camera permissions and try again."
-          );
-        }
-      } else {
-        setError(
-          "Failed to initialize camera. Please check camera permissions and try again."
-        );
-      }
-    } finally {
-      setIsInitializing(false);
-    }
+    return true;
   };
 
   useEffect(() => {
-    initializeScanner();
+    const initScanner = async () => {
+      try {
+        setIsInitializing(true);
+        setError(null);
+
+        const hasPermission = await checkIOSPermission();
+        if (!hasPermission) {
+          throw new Error(
+            'Camera access denied. Please allow camera access in your device settings:\n' +
+            'Settings > Safari > Camera > Allow'
+          );
+        }
+
+        if (!videoRef.current) return;
+
+        scannerRef.current = new QrScanner(
+          videoRef.current,
+          (result) => {
+            onScan(result.data);
+          },
+          {
+            preferredCamera: 'environment',
+            highlightScanRegion: true,
+            highlightCodeOutline: true,
+            returnDetailedScanResult: true,
+          }
+        );
+
+        await scannerRef.current.start();
+        setIsInitializing(false);
+      } catch (err) {
+        console.error('Scanner initialization error:', err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Failed to initialize camera. Please check camera permissions.'
+        );
+        setIsInitializing(false);
+      }
+    };
+
+    initScanner();
 
     return () => {
-      const cleanup = async () => {
-        try {
-          if (scannerRef.current) {
-            await scannerRef.current.stop();
-            await scannerRef.current.clear();
-          }
-        } catch (err) {
-          console.error("Cleanup error:", err);
-        }
-      };
-      cleanup();
+      if (scannerRef.current) {
+        scannerRef.current.stop();
+        scannerRef.current.destroy();
+      }
     };
-  }, []);
+  }, [onScan]);
 
   const handleRetry = async () => {
-    await initializeScanner();
+    if (scannerRef.current) {
+      scannerRef.current.stop();
+      scannerRef.current.destroy();
+    }
+    setError(null);
+    setIsInitializing(true);
+    const hasPermission = await checkIOSPermission();
+    if (hasPermission && videoRef.current) {
+      try {
+        scannerRef.current = new QrScanner(
+          videoRef.current,
+          (result) => {
+            onScan(result.data);
+          },
+          {
+            preferredCamera: 'environment',
+            highlightScanRegion: true,
+            highlightCodeOutline: true,
+            returnDetailedScanResult: true,
+          }
+        );
+        await scannerRef.current.start();
+      } catch (err) {
+        setError('Failed to initialize camera. Please try again.');
+      }
+    }
+    setIsInitializing(false);
   };
 
   return (
@@ -191,10 +158,12 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan, onClose }) => {
             </div>
           ) : (
             <>
-              <div
-                id="qr-reader"
-                className="w-full aspect-square rounded-lg overflow-hidden bg-gray-100"
-              />
+              <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                <video 
+                  ref={videoRef} 
+                  className="w-full h-full object-cover"
+                />
+              </div>
               <div className="mt-4 space-y-2">
                 <p className="text-sm text-gray-600 text-center">
                   Position the QR code within the frame to scan
