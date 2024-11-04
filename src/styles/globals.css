@@ -80,3 +80,15 @@ body {
 #qr-reader * {
   border: none !important;
 }
+
+video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+@supports (-webkit-touch-callout: none) {
+  .qr-scanner-viewport {
+    height: 100% !important;
+  }
+}

@@ -14,69 +14,74 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
 
-  const checkIOSPermission = async () => {
-    if (/iPad|iPhone|iPod/.test(navigator.userAgent) && 'mediaDevices' in navigator) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'environment'
-          }
-        });
-        stream.getTracks().forEach(track => track.stop());
-        return true;
-      } catch (err) {
-        console.error('iOS Camera permission error:', err);
-        return false;
-      }
-    }
-    return true;
-  };
-
   useEffect(() => {
-    const initScanner = async () => {
-      try {
-        setIsInitializing(true);
-        setError(null);
+    let mounted = true;
 
-        const hasPermission = await checkIOSPermission();
-        if (!hasPermission) {
-          throw new Error(
-            'Camera access denied. Please allow camera access in your device settings:\n' +
-            'Settings > Safari > Camera > Allow'
-          );
+    const initializeCamera = async () => {
+      try {
+        // First check if we have camera permissions
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+
+        // If we got here, we have camera permission
+        if (!mounted) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
         }
 
-        if (!videoRef.current) return;
-
-        scannerRef.current = new QrScanner(
-          videoRef.current,
-          (result) => {
-            onScan(result.data);
-          },
-          {
-            preferredCamera: 'environment',
-            highlightScanRegion: true,
-            highlightCodeOutline: true,
-            returnDetailedScanResult: true,
+        // Initialize QR Scanner
+        if (videoRef.current) {
+          if (scannerRef.current) {
+            scannerRef.current.stop();
           }
-        );
 
-        await scannerRef.current.start();
-        setIsInitializing(false);
+          scannerRef.current = new QrScanner(
+            videoRef.current,
+            result => {
+              if (mounted) {
+                onScan(result.data);
+              }
+            },
+            {
+              preferredCamera: 'environment',
+              highlightScanRegion: true,
+              highlightCodeOutline: true,
+              maxScansPerSecond: 3,
+            }
+          );
+
+          await scannerRef.current.start();
+          setIsInitializing(false);
+        }
+
       } catch (err) {
-        console.error('Scanner initialization error:', err);
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'Failed to initialize camera. Please check camera permissions.'
-        );
-        setIsInitializing(false);
+        console.error('Camera initialization error:', err);
+        if (mounted) {
+          if (err instanceof Error) {
+            if (err.name === 'NotAllowedError') {
+              setError(
+                'Camera access was denied. Please enable camera access:\n\n' +
+                '1. Go to Settings\n' +
+                '2. Find Safari\n' +
+                '3. Enable Camera Access\n' +
+                '4. Return and try again'
+              );
+            } else {
+              setError('Failed to initialize camera. Please try again.');
+            }
+          } else {
+            setError('Failed to initialize camera. Please try again.');
+          }
+          setIsInitializing(false);
+        }
       }
     };
 
-    initScanner();
+    initializeCamera();
 
     return () => {
+      mounted = false;
       if (scannerRef.current) {
         scannerRef.current.stop();
         scannerRef.current.destroy();
@@ -85,96 +90,88 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScan, onClose }) => {
   }, [onScan]);
 
   const handleRetry = async () => {
-    if (scannerRef.current) {
-      scannerRef.current.stop();
-      scannerRef.current.destroy();
-    }
     setError(null);
     setIsInitializing(true);
-    const hasPermission = await checkIOSPermission();
-    if (hasPermission && videoRef.current) {
-      try {
+    try {
+      if (scannerRef.current) {
+        scannerRef.current.stop();
+        scannerRef.current.destroy();
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+
+      if (videoRef.current && stream) {
         scannerRef.current = new QrScanner(
           videoRef.current,
-          (result) => {
-            onScan(result.data);
-          },
+          result => onScan(result.data),
           {
             preferredCamera: 'environment',
             highlightScanRegion: true,
             highlightCodeOutline: true,
-            returnDetailedScanResult: true,
+            maxScansPerSecond: 3,
           }
         );
         await scannerRef.current.start();
-      } catch (err) {
-        setError('Failed to initialize camera. Please try again.');
       }
+    } catch (err) {
+      setError('Failed to initialize camera. Please check your camera permissions.');
     }
     setIsInitializing(false);
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg w-full max-w-sm mx-auto overflow-hidden">
-        <div className="p-4 bg-blue-600 text-white flex justify-between items-center">
-          <div className="flex items-center">
-            <Camera className="w-5 h-5 mr-2" />
-            <h2 className="text-lg font-semibold">Scan Quiz QR Code</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-blue-700 rounded-full transition-colors"
-            aria-label="Close scanner"
-          >
-            <X className="w-5 h-5" />
-          </button>
+    <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex flex-col">
+      {/* iOS-style header */}
+      <div className="bg-[#0066FF] px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center">
+          <Camera className="w-5 h-5 mr-2 text-white" />
+          <span className="text-white text-lg font-semibold">Scan Quiz QR Code</span>
         </div>
+        <button
+          onClick={onClose}
+          className="text-white p-1 rounded-full hover:bg-blue-600"
+        >
+          <X className="w-6 h-6" />
+        </button>
+      </div>
 
-        <div className="p-4">
-          {isInitializing ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent mx-auto"></div>
-              <p className="mt-4 text-gray-600">Initializing camera...</p>
+      <div className="flex-1 flex flex-col items-center justify-center p-4 bg-white">
+        {isInitializing ? (
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#0066FF] border-t-transparent mx-auto"></div>
+            <p className="mt-4 text-gray-600 text-lg">Initializing camera...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center px-4">
+            <p className="text-red-500 mb-6 whitespace-pre-line">{error}</p>
+            <button
+              onClick={handleRetry}
+              className="w-full py-3 bg-[#0066FF] text-white rounded-md text-lg mb-3"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={onClose}
+              className="w-full py-3 bg-gray-100 text-gray-800 rounded-md text-lg"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="w-full max-w-md">
+            <div className="aspect-square rounded-lg overflow-hidden bg-black">
+              <video 
+                ref={videoRef}
+                className="w-full h-full object-cover"
+              />
             </div>
-          ) : error ? (
-            <div className="text-center py-8">
-              <p className="text-red-600 mb-4 whitespace-pre-line">{error}</p>
-              <div className="space-y-2">
-                <button
-                  onClick={handleRetry}
-                  className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  <RefreshCcw className="w-4 h-4 mr-2" />
-                  Try Again
-                </button>
-                <button
-                  onClick={onClose}
-                  className="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-                <video 
-                  ref={videoRef} 
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="mt-4 space-y-2">
-                <p className="text-sm text-gray-600 text-center">
-                  Position the QR code within the frame to scan
-                </p>
-                <p className="text-xs text-gray-500 text-center">
-                  Make sure the QR code is well-lit and clear
-                </p>
-              </div>
-            </>
-          )}
-        </div>
+            <p className="text-center mt-4 text-gray-600">
+              Position the QR code within the frame to scan
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
