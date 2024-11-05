@@ -33,10 +33,6 @@ const nextConfig = {
       },
     ];
   },
-  // Add security config for camera access
-  experimental: {
-    secureHeaders: true
-  },
   // Add CORS config
   async rewrites() {
     return [

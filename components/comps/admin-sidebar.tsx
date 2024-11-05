@@ -22,7 +22,7 @@ const sidebarItems = [
   { name: "User Management", href: "/usermanagement", icon: UserGroupIcon },
   { name: "Quiz Management", href: "/admin/quizzes", icon: ClipboardListIcon },
   { name: "Add User", href: "/adduser", icon: AcademicCapIcon },
-  { name: "Analytics", href: "/admin/analytics", icon: ChartBarIcon },
+  { name: "Analytics", href: "/statistics", icon: ChartBarIcon },
   { name: "Settings", href: "/admin/settings", icon: CogIcon },
 ];
 
