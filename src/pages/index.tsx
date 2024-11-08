@@ -57,12 +57,12 @@ const teamMembers = [
 ];
 
 const words = [
-  { text: "Challenge" },
-  { text: "your" },
-  { text: "knowledge" },
-  { text: "and" },
-  { text: "expand" },
-  { text: "your" },
+  { text: "Challenge", className: "text-white" },
+  { text: "your", className: "text-white" },
+  { text: "knowledge", className: "text-white" },
+  { text: "and", className: "text-white" },
+  { text: "expand", className: "text-white" },
+  { text: "your", className: "text-white" },
   { text: "mind", className: "text-blue-500" },
 ];
 
