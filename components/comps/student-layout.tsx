@@ -96,13 +96,15 @@ const StudentLayout: React.FC<StudentLayoutProps> = ({ children, studentName, st
         />
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Navbar 
-          studentName={studentName} 
-          studentId={studentId} 
-          profilePictureUrl={profilePictureUrl}
-        />
-        <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 flex flex-col overflow-hidden pl-4 pr-4 pt-4">
+        <div className="mb-4">
+          <Navbar 
+            studentName={studentName} 
+            studentId={studentId} 
+            profilePictureUrl={profilePictureUrl}
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto bg-white rounded-lg shadow-md p-6">
           {children}
         </div>
       </div>

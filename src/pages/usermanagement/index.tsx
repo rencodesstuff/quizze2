@@ -1,22 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import AdminLayout from "@/comps/admin-layout";
-import { 
-  Card, 
-  Title, 
-  Text,
-  Table,
-  TableHead,
-  TableRow,
-  TableHeaderCell,
-  TableBody,
-  TableCell,
-  Button,
-  TextInput,
-  Flex
-} from "@tremor/react";
+import { Card, Title, Text } from "@tremor/react";
 import { SearchIcon, ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from '@heroicons/react/solid';
 import { createClient } from '../../../utils/supabase/component';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/ui/table";
+import { Input } from "@/ui/input";
+import { Button } from "@/ui/button";
 
 interface User {
   id: string;
@@ -56,18 +53,18 @@ const UserManagement: React.FC = () => {
       if (studentsError || teachersError) throw studentsError || teachersError;
 
       const formattedUsers: User[] = [
-        ...studentsData.map((student: any) => ({
+        ...(studentsData?.map((student) => ({
           id: student.id,
           name: student.name,
           role: 'student',
           status: 'Active'
-        })),
-        ...teachersData.map((teacher: any) => ({
+        })) || []),
+        ...(teachersData?.map((teacher) => ({
           id: teacher.id,
           name: teacher.name,
           role: 'teacher',
           status: 'Active'
-        }))
+        })) || [])
       ];
 
       setUsers(formattedUsers);
@@ -76,6 +73,20 @@ const UserManagement: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRoleFilterChange = (value: string) => {
+    setRoleFilter(value);
+    setCurrentPage(1);
+    setIsDropdownOpen(false);
+  };
+
+  const handleEditUser = (userId: string) => {
+    router.push(`/usermanagement/edit/${userId}`);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
   };
 
   const filteredUsers = users.filter(user => 
@@ -90,30 +101,12 @@ const UserManagement: React.FC = () => {
   );
 
   const getBadgeStyle = (type: 'role' | 'status', value: string) => {
-    let bgColor = '';
-    let textColor = 'text-white';
-    
     if (type === 'role') {
-      bgColor = value === 'student' ? 'bg-blue-500' : 'bg-green-500';
-    } else if (type === 'status') {
-      bgColor = 'bg-green-500';
+      return value === 'student' 
+        ? 'inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20'
+        : 'inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20';
     }
-
-    return `${bgColor} ${textColor} text-xs font-medium mr-2 px-2.5 py-0.5 rounded`;
-  };
-
-  const handlePageChange = (newPage: number) => {
-    setCurrentPage(newPage);
-  };
-
-  const handleRoleFilterChange = (value: string) => {
-    setRoleFilter(value);
-    setCurrentPage(1);
-    setIsDropdownOpen(false);
-  };
-
-  const handleEditUser = (userId: string) => {
-    router.push(`/usermanagement/edit/${userId}`);
+    return 'inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20';
   };
 
   return (
@@ -122,134 +115,124 @@ const UserManagement: React.FC = () => {
         <Title>User Management</Title>
         <Text>Manage and overview all users</Text>
 
-        <div className="mt-6 bg-gray-50 p-4 rounded-lg">
-          <Flex justifyContent="between" alignItems="center" className="space-x-4">
-            <TextInput 
-              icon={SearchIcon}
-              placeholder="Search users..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-grow"
-            />
-            <div className="relative">
-              <button
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex items-center justify-between w-40 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-indigo-500"
-              >
-                {roleFilter === 'all' ? 'All Roles' : roleFilter === 'student' ? 'Students' : 'Teachers'}
-                <ChevronDownIcon className="w-5 h-5 ml-2 -mr-1" aria-hidden="true" />
-              </button>
-              {isDropdownOpen && (
-                <div className="absolute right-0 w-40 mt-2 origin-top-right bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5">
-                  <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                    <button
-                      onClick={() => handleRoleFilterChange('all')}
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 w-full text-left"
-                      role="menuitem"
-                    >
-                      All Roles
-                    </button>
-                    <button
-                      onClick={() => handleRoleFilterChange('student')}
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 w-full text-left"
-                      role="menuitem"
-                    >
-                      Students
-                    </button>
-                    <button
-                      onClick={() => handleRoleFilterChange('teacher')}
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 w-full text-left"
-                      role="menuitem"
-                    >
-                      Teachers
-                    </button>
+        <div className="mt-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-1 items-center space-x-2">
+              <Input
+                placeholder="Search users..."
+                value={searchTerm}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                className="max-w-sm"
+              />
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="flex items-center gap-2"
+                >
+                  {roleFilter === 'all' ? 'All Roles' : roleFilter === 'student' ? 'Students' : 'Teachers'}
+                  <ChevronDownIcon className="h-4 w-4" />
+                </Button>
+                {isDropdownOpen && (
+                  <div className="absolute top-full right-0 mt-2 w-40 rounded-md border bg-popover shadow-md z-10">
+                    <div className="p-1">
+                      {['all', 'student', 'teacher'].map((role) => (
+                        <button
+                          key={role}
+                          onClick={() => handleRoleFilterChange(role)}
+                          className="relative flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+                        >
+                          {role === 'all' ? 'All Roles' : role === 'student' ? 'Students' : 'Teachers'}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          </Flex>
-        </div>
-
-        {isLoading ? (
-          <Text>Loading users...</Text>
-        ) : (
-          <>
-            <Table className="mt-6">
-              <TableHead>
-                <TableRow>
-                  <TableHeaderCell>Name</TableHeaderCell>
-                  <TableHeaderCell>Role</TableHeaderCell>
-                  <TableHeaderCell>Status</TableHeaderCell>
-                  <TableHeaderCell>Actions</TableHeaderCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {paginatedUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>{user.name}</TableCell>
-                    <TableCell>
-                      <span className={getBadgeStyle('role', user.role)}>
-                        {user.role}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className={getBadgeStyle('status', user.status)}>
-                        {user.status}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Button 
-                        size="xs" 
-                        variant="secondary" 
-                        color="gray"
-                        onClick={() => handleEditUser(user.id)}
-                      >
-                        Edit
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            
-            <div className="mt-4 flex items-center justify-between">
-              <Text>
-                Showing {((currentPage - 1) * USERS_PER_PAGE) + 1} to {Math.min(currentPage * USERS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length} users
-              </Text>
-              <div className="flex items-center space-x-2">
-                <Button
-                  icon={ChevronLeftIcon}
-                  variant="secondary"
-                  color="gray"
-                  disabled={currentPage === 1}
-                  onClick={() => handlePageChange(currentPage - 1)}
-                >
-                  Previous
-                </Button>
-                {[...Array(totalPages)].map((_, index) => (
-                  <Button
-                    key={index}
-                    variant={currentPage === index + 1 ? "primary" : "secondary"}
-                    color={currentPage === index + 1 ? "blue" : "gray"}
-                    onClick={() => handlePageChange(index + 1)}
-                  >
-                    {index + 1}
-                  </Button>
-                ))}
-                <Button
-                  icon={ChevronRightIcon}
-                  iconPosition="right"
-                  variant="secondary"
-                  color="gray"
-                  disabled={currentPage === totalPages}
-                  onClick={() => handlePageChange(currentPage + 1)}
-                >
-                  Next
-                </Button>
+                )}
               </div>
             </div>
-          </>
-        )}
+          </div>
+
+          {isLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            </div>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[200px]">Name</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">{user.name}</TableCell>
+                      <TableCell>
+                        <span className={getBadgeStyle('role', user.role)}>
+                          {user.role}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className={getBadgeStyle('status', user.status)}>
+                          {user.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditUser(user.id)}
+                        >
+                          Edit
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between space-x-2 py-4">
+            <Text>
+              Showing {((currentPage - 1) * USERS_PER_PAGE) + 1} to {Math.min(currentPage * USERS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length} users
+            </Text>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeftIcon className="h-4 w-4 mr-2" />
+                Previous
+              </Button>
+              {[...Array(totalPages)].map((_, index) => (
+                <Button
+                  key={index}
+                  variant={currentPage === index + 1 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handlePageChange(index + 1)}
+                >
+                  {index + 1}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                Next
+                <ChevronRightIcon className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </div>
+        </div>
       </Card>
     </AdminLayout>
   );

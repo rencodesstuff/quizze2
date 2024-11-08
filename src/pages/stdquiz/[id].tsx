@@ -101,6 +101,7 @@ const TakeQuiz: React.FC = () => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [randomSeed, setRandomSeed] = useState<number>(0);
+  const [hasAnimatedModal, setHasAnimatedModal] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -491,7 +492,7 @@ const TakeQuiz: React.FC = () => {
           </div>
         </div>
       </header>
-  
+
       <main className="flex-grow flex p-4">
         <div className="w-1/4 bg-white shadow-xl rounded-lg p-4 mr-4">
           <h2 className="text-lg font-bold mb-4">Questions</h2>
@@ -499,7 +500,7 @@ const TakeQuiz: React.FC = () => {
             {quiz.questions.map((q, index) => {
               const hasAnswer =
                 q.id in answers && !isAnswerEmpty(answers[q.id]);
-  
+
               return (
                 <button
                   key={q.id}
@@ -517,7 +518,7 @@ const TakeQuiz: React.FC = () => {
             })}
           </div>
         </div>
-  
+
         <div className="flex-grow relative">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
@@ -575,69 +576,83 @@ const TakeQuiz: React.FC = () => {
         </div>
       </main>
 
-      <AnimatePresence>
-        {showConfirmation && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-          >
-            <motion.div
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              className="bg-white p-8 rounded-lg max-w-2xl w-full m-4"
-            >
-              <h2 className="text-2xl font-bold mb-4">Review Your Answers</h2>
-              <div className="max-h-[60vh] overflow-y-auto">
-                {quiz.questions.map((question, index) => (
-                  <div
-                    key={question.id}
-                    className="mb-4 p-4 bg-gray-50 rounded-lg"
+      <AnimatePresence mode="wait" initial={false}>
+  {showConfirmation && (
+    <div className="fixed inset-0 z-50">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 bg-black bg-opacity-50"
+        key="modal-backdrop"
+      />
+      
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <motion.div
+          key="modal-content"
+          initial={hasAnimatedModal ? false : { scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.95, opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onAnimationComplete={() => setHasAnimatedModal(true)}
+          className="bg-white rounded-lg max-w-2xl w-full"
+        >
+          <div className="p-6">
+            <h2 className="text-2xl font-bold mb-4">Review Your Answers</h2>
+            <div className="max-h-[60vh] overflow-y-auto custom-scrollbar space-y-4">
+              {quiz.questions.map((question, index) => (
+                <div
+                  key={question.id}
+                  className="p-4 bg-gray-50 rounded-lg"
+                >
+                  <p className="font-semibold">
+                    Question {index + 1}: {question.text}
+                  </p>
+                  <p
+                    className={
+                      question.id in answers
+                        ? "text-blue-600 mt-2"
+                        : "text-yellow-600 mt-2"
+                    }
                   >
-                    <p className="font-semibold">
-                      Question {index + 1}: {question.text}
-                    </p>
-                    <p
-                      className={
-                        question.id in answers
-                          ? "text-blue-600 mt-2"
-                          : "text-yellow-600 mt-2"
-                      }
-                    >
-                      {question.id in answers
-                        ? `Your answer: ${formatAnswer(
-                            question,
-                            answers[question.id]
-                          )}`
-                        : "Not answered"}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-between mt-6">
-                <button
-                  onClick={() => setShowConfirmation(false)}
-                  className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition duration-150"
-                >
-                  Go Back
-                </button>
-                <button
-                  onClick={handleSubmitQuiz}
-                  disabled={isSubmitting}
-                  className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150 disabled:opacity-50"
-                >
-                  {isSubmitting ? "Submitting..." : "Confirm Submission"}
-                </button>
-              </div>
-              {submitError && (
-                <p className="mt-4 text-red-500 text-center">{submitError}</p>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                    {question.id in answers
+                      ? `Your answer: ${formatAnswer(
+                          question,
+                          answers[question.id]
+                        )}`
+                      : "Not answered"}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between mt-6">
+              <button
+                onClick={() => {
+                  setShowConfirmation(false);
+                  setHasAnimatedModal(false);  // Reset animation state when closing
+                }}
+                className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition duration-150"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleSubmitQuiz}
+                disabled={isSubmitting}
+                className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150 disabled:opacity-50"
+              >
+                {isSubmitting ? "Submitting..." : "Confirm Submission"}
+              </button>
+            </div>
+            {submitError && (
+              <p className="mt-4 text-red-500 text-center">{submitError}</p>
+            )}
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  )}
+</AnimatePresence>
     </div>
   );
 

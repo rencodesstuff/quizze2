@@ -31,11 +31,7 @@ const TeacherLayout: React.FC<TeacherLayoutProps> = ({ children }) => {
       if (!mobile) {
         setIsSidebarOpen(false);
       }
-      
     };
-
-    
-
 
     handleResize();
     window.addEventListener("resize", handleResize);
@@ -136,14 +132,16 @@ const TeacherLayout: React.FC<TeacherLayoutProps> = ({ children }) => {
         />
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TeacherNavbar 
-          teacherName={teacherName} 
-          teacherCourse={teacherCourse} 
-          profilePictureUrl={profilePictureUrl}
-          isLoading={isLoading}
-        />
-        <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 flex flex-col overflow-hidden pl-4 pr-4 pt-4">
+        <div className="mb-4">
+          <TeacherNavbar 
+            teacherName={teacherName} 
+            teacherCourse={teacherCourse} 
+            profilePictureUrl={profilePictureUrl}
+            isLoading={isLoading}
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto bg-white rounded-lg shadow-md p-6">
           {children}
         </div>
       </div>

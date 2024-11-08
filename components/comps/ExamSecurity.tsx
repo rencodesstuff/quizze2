@@ -24,6 +24,7 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
   const [isBlurred, setIsBlurred] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
   const [violationCount, setViolationCount] = useState(0);
+  const [needsUserAction, setNeedsUserAction] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -40,21 +41,23 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
       if (document.hidden) {
         setIsBlurred(true);
         setShowWarning(true);
+        setNeedsUserAction(true);
         handleSecurityViolation('tab_switch');
-      } else {
+      }
+    };
+
+    const handleFocus = () => {
+      // Only remove blur if user has acknowledged the warning
+      if (!needsUserAction) {
         setIsBlurred(false);
         setShowWarning(false);
       }
     };
 
-    const handleFocus = () => {
-      setIsBlurred(false);
-      setShowWarning(false);
-    };
-
     const handleBlur = () => {
       setIsBlurred(true);
       setShowWarning(true);
+      setNeedsUserAction(true);
       handleSecurityViolation('window_blur');
     };
 
@@ -69,7 +72,7 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [strictMode]);
+  }, [strictMode, needsUserAction]);
 
   const handleSecurityViolation = async (violationType: string) => {
     if (!strictMode) return;
@@ -80,7 +83,6 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No authenticated user found");
 
-      // Log the security violation
       await supabase.from('quiz_security_violations').insert({
         quiz_id: quizId,
         student_id: user.id,
@@ -89,7 +91,6 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
         quiz_title: quizTitle
       });
 
-      // Send real-time notification
       const channel = supabase.channel('security-violations');
       channel.send({
         type: 'broadcast',
@@ -112,6 +113,13 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
     }
   };
 
+  const handleReturnToQuiz = () => {
+    setNeedsUserAction(false);
+    setIsBlurred(false);
+    setShowWarning(false);
+    enterFullscreen();
+  };
+
   if (strictMode && !isFullscreen) {
     return (
       <div className="fixed inset-0 bg-gray-900 text-white flex items-center justify-center z-50">
@@ -132,12 +140,12 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
   return (
     <div className="relative">
       {/* Quiz content with conditional blur */}
-      <div className={`transition-all duration-300 ${isBlurred ? 'blur-sm' : ''}`}>
+      <div className={`transition-all duration-300 ${(isBlurred || needsUserAction) ? 'blur-sm' : ''}`}>
         {children}
       </div>
       
-      {/* Warning modal - now positioned above the blur */}
-      {showWarning && (
+      {/* Warning modal - stays visible until user explicitly dismisses it */}
+      {(showWarning || needsUserAction) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl max-w-md">
             <div className="flex items-center text-red-600 mb-4">
@@ -151,10 +159,7 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
             </p>
             <div className="flex justify-end space-x-4">
               <button
-                onClick={() => {
-                  setShowWarning(false);
-                  enterFullscreen();
-                }}
+                onClick={handleReturnToQuiz}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors duration-150"
               >
                 Return to Quiz
