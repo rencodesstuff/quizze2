@@ -57,7 +57,7 @@ const JoinQuizPage = () => {
         } catch (error) {
           console.error('Error joining quiz:', error);
           alert('Failed to join quiz. Please try again or enter the code manually.');
-          router.push('/stdinbox');
+          router.push('/stdquiz');
         }
       }
     };

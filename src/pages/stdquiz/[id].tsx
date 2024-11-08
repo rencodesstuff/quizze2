@@ -10,6 +10,7 @@ import {
   ShortAnswer,
   MultipleSelection,
   QuestionType,
+  DragDrop,
 } from "@/comps/QuestionTypes";
 import ErrorModal from "@/comps/ErrorModal";
 import ExamSecurityWrapper from "@/comps/ExamSecurity";
@@ -30,6 +31,8 @@ interface BaseQuestion {
   image_url?: string;
   explanation?: string;
   multiple_correct_answers?: string[];
+  dragDropText?: string[];
+  dragDropAnswers?: string[];
 }
 
 interface Quiz {
@@ -420,6 +423,8 @@ const TakeQuiz: React.FC = () => {
             No options available for this question.
           </p>
         );
+      case "drag-drop":
+        return <DragDrop {...commonProps} />;
 
       default:
         console.warn(`Unexpected question type: ${question.type}`);
@@ -577,82 +582,86 @@ const TakeQuiz: React.FC = () => {
       </main>
 
       <AnimatePresence mode="wait" initial={false}>
-  {showConfirmation && (
-    <div className="fixed inset-0 z-50">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
-        className="fixed inset-0 bg-black bg-opacity-50"
-        key="modal-backdrop"
-      />
-      
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <motion.div
-          key="modal-content"
-          initial={hasAnimatedModal ? false : { scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          onAnimationComplete={() => setHasAnimatedModal(true)}
-          className="bg-white rounded-lg max-w-2xl w-full"
-        >
-          <div className="p-6">
-            <h2 className="text-2xl font-bold mb-4">Review Your Answers</h2>
-            <div className="max-h-[60vh] overflow-y-auto custom-scrollbar space-y-4">
-              {quiz.questions.map((question, index) => (
-                <div
-                  key={question.id}
-                  className="p-4 bg-gray-50 rounded-lg"
-                >
-                  <p className="font-semibold">
-                    Question {index + 1}: {question.text}
-                  </p>
-                  <p
-                    className={
-                      question.id in answers
-                        ? "text-blue-600 mt-2"
-                        : "text-yellow-600 mt-2"
-                    }
-                  >
-                    {question.id in answers
-                      ? `Your answer: ${formatAnswer(
-                          question,
-                          answers[question.id]
-                        )}`
-                      : "Not answered"}
-                  </p>
+        {showConfirmation && (
+          <div className="fixed inset-0 z-50">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black bg-opacity-50"
+              key="modal-backdrop"
+            />
+
+            <div className="fixed inset-0 flex items-center justify-center p-4">
+              <motion.div
+                key="modal-content"
+                initial={hasAnimatedModal ? false : { scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                onAnimationComplete={() => setHasAnimatedModal(true)}
+                className="bg-white rounded-lg max-w-2xl w-full"
+              >
+                <div className="p-6">
+                  <h2 className="text-2xl font-bold mb-4">
+                    Review Your Answers
+                  </h2>
+                  <div className="max-h-[60vh] overflow-y-auto custom-scrollbar space-y-4">
+                    {quiz.questions.map((question, index) => (
+                      <div
+                        key={question.id}
+                        className="p-4 bg-gray-50 rounded-lg"
+                      >
+                        <p className="font-semibold">
+                          Question {index + 1}: {question.text}
+                        </p>
+                        <p
+                          className={
+                            question.id in answers
+                              ? "text-blue-600 mt-2"
+                              : "text-yellow-600 mt-2"
+                          }
+                        >
+                          {question.id in answers
+                            ? `Your answer: ${formatAnswer(
+                                question,
+                                answers[question.id]
+                              )}`
+                            : "Not answered"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between mt-6">
+                    <button
+                      onClick={() => {
+                        setShowConfirmation(false);
+                        setHasAnimatedModal(false); // Reset animation state when closing
+                      }}
+                      className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition duration-150"
+                    >
+                      Go Back
+                    </button>
+                    <button
+                      onClick={handleSubmitQuiz}
+                      disabled={isSubmitting}
+                      className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150 disabled:opacity-50"
+                    >
+                      {isSubmitting ? "Submitting..." : "Confirm Submission"}
+                    </button>
+                  </div>
+                  {submitError && (
+                    <p className="mt-4 text-red-500 text-center">
+                      {submitError}
+                    </p>
+                  )}
                 </div>
-              ))}
+              </motion.div>
             </div>
-            <div className="flex justify-between mt-6">
-              <button
-                onClick={() => {
-                  setShowConfirmation(false);
-                  setHasAnimatedModal(false);  // Reset animation state when closing
-                }}
-                className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition duration-150"
-              >
-                Go Back
-              </button>
-              <button
-                onClick={handleSubmitQuiz}
-                disabled={isSubmitting}
-                className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition duration-150 disabled:opacity-50"
-              >
-                {isSubmitting ? "Submitting..." : "Confirm Submission"}
-              </button>
-            </div>
-            {submitError && (
-              <p className="mt-4 text-red-500 text-center">{submitError}</p>
-            )}
           </div>
-        </motion.div>
-      </div>
-    </div>
-  )}
-</AnimatePresence>
+        )}
+      </AnimatePresence>
     </div>
   );
 
