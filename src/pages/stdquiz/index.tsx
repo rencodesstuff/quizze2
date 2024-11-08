@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import StudentLayout from "@/comps/student-layout";
 import { Card, Title, Text } from "@tremor/react";
-import { Camera, Clock, Calendar, CheckCircle } from "lucide-react";
+import { Camera, Clock, Calendar, CheckCircle, Loader } from "lucide-react";
 import Modal from "@/comps/Modal";
 import dynamic from 'next/dynamic';
 import JoinQuizForm from '@/comps/JoinQuizForm';
@@ -12,14 +12,14 @@ import TabComponent from '@/comps/TabComponent';
 import { useQuizzes } from "../../hooks/useQuizzes";
 import { useStudentInfo } from "../../hooks/useStudentInfo";
 
-// Dynamically import QR Scanner
+// Dynamically import QR Scanner with loading state
 const QRCodeScanner = dynamic(() => import('@/comps/QRCodeScanner'), {
   ssr: false,
   loading: () => (
     <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center">
-      <div className="bg-white p-6 rounded-lg">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-        <p className="text-center mt-4">Loading camera...</p>
+      <div className="bg-white p-6 rounded-lg shadow-md text-center">
+        <Loader className="w-8 h-8 animate-spin mx-auto text-blue-500" />
+        <p className="mt-4 text-gray-600">Initializing camera...</p>
       </div>
     </div>
   ),
@@ -45,19 +45,32 @@ const StudentQuizzes = () => {
   const [isJoining, setIsJoining] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check if device is mobile
+  // Check if device is mobile and has camera capability
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(
+    const checkMobileAndCamera = async () => {
+      const isMobileDevice = 
         window.innerWidth < 768 || 
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-      );
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if (isMobileDevice) {
+        try {
+          // Check if device has camera capability
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const hasCamera = devices.some(device => device.kind === 'videoinput');
+          setIsMobile(hasCamera);
+        } catch (error) {
+          console.error('Error checking camera:', error);
+          setIsMobile(false);
+        }
+      } else {
+        setIsMobile(false);
+      }
     };
     
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
+    checkMobileAndCamera();
+    window.addEventListener('resize', () => checkMobileAndCamera());
     
-    return () => window.removeEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', () => checkMobileAndCamera());
   }, []);
 
   useEffect(() => {
@@ -84,19 +97,30 @@ const StudentQuizzes = () => {
 
   const handleQRScan = async (scannedCode: string) => {
     try {
-      let code = scannedCode;
+      let code = scannedCode.trim();
+      
       // Try to extract code from URL if it's a URL
       try {
-        const url = new URL(scannedCode);
-        const urlCode = url.searchParams.get('code');
-        if (urlCode) code = urlCode;
-      } catch {
-        // If not a URL, use the code as-is
+        if (code.includes('http')) {
+          const url = new URL(scannedCode);
+          const urlCode = url.searchParams.get('code');
+          if (urlCode) {
+            code = urlCode.trim();
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing URL:', error);
       }
+
+      // Validate code format
+      if (!code || code.length !== 6) {
+        throw new Error('Invalid QR code format. Code must be 6 characters long.');
+      }
+
       await handleJoinQuiz(code);
     } catch (error) {
       console.error('Error processing QR code:', error);
-      setErrorMessage('Invalid QR code');
+      setErrorMessage(error instanceof Error ? error.message : 'Invalid QR code');
       setShowErrorModal(true);
     }
   };
@@ -126,7 +150,7 @@ const StudentQuizzes = () => {
     return (
       <StudentLayout studentName="" studentId="">
         <div className="flex justify-center items-center h-screen">
-          <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+          <Loader className="w-32 h-32 animate-spin text-blue-500" />
         </div>
       </StudentLayout>
     );
@@ -157,10 +181,20 @@ const StudentQuizzes = () => {
               {isMobile && (
                 <button
                   onClick={() => setShowScanner(true)}
-                  className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  disabled={isJoining}
+                  className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Camera className="w-5 h-5 mr-2" />
-                  Scan QR Code
+                  {isJoining ? (
+                    <>
+                      <Loader className="w-5 h-5 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-5 h-5 mr-2" />
+                      Scan QR Code
+                    </>
+                  )}
                 </button>
               )}
             </div>
