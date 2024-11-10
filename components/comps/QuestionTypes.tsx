@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import {
   DndContext,
@@ -11,6 +11,9 @@ import {
   closestCenter
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { Textarea } from "@/ui/textarea";
+
+
 
 interface QuestionProps {
   question: {
@@ -96,15 +99,12 @@ export const DragDrop: React.FC<QuestionProps> = ({
     return question.drag_drop_answers || question.dragDropAnswers || [];
   }, [question.drag_drop_answers, question.dragDropAnswers]);
 
-  
-  // Initialize currentAnswers with dragDropAnswers
   useEffect(() => {
     if (!answers[question.id] && question.dragDropAnswers) {
       handleAnswer(question.id, question.dragDropAnswers);
     }
   }, [question.dragDropAnswers, question.id, answers, handleAnswer]);
 
-  // Parse the current answers safely
   const currentAnswers = useMemo(() => {
     const answer = answers[question.id];
     if (!answer) return new Array(question.drag_drop_text?.length || 0).fill('');
@@ -131,13 +131,11 @@ export const DragDrop: React.FC<QuestionProps> = ({
       const blankIndex = parseInt(targetId.split('-')[1]);
       const newAnswers = [...currentAnswers];
       
-      // Remove the answer from its previous position if it exists
       const oldIndex = newAnswers.indexOf(answer);
       if (oldIndex !== -1) {
         newAnswers[oldIndex] = '';
       }
       
-      // Place the answer in the new position
       newAnswers[blankIndex] = answer;
       
       handleAnswer(question.id, newAnswers);
@@ -169,7 +167,6 @@ export const DragDrop: React.FC<QuestionProps> = ({
         onDragEnd={handleDragEnd}
       >
         <div className="space-y-6">
-          {/* Question Text with Blanks */}
           <div className="text-lg text-gray-700 bg-white p-4 rounded-lg border border-gray-200">
             {textSegments.map((segment, index) => (
               <React.Fragment key={index}>
@@ -184,7 +181,6 @@ export const DragDrop: React.FC<QuestionProps> = ({
             ))}
           </div>
 
-          {/* Available Answers */}
           <div className="mt-6">
             <h3 className="text-sm font-medium text-gray-700 mb-3">
               Available Answers:
@@ -223,9 +219,7 @@ export const MultipleChoice: React.FC<QuestionProps> = ({
   showExplanation,
 }) => {
   if (!question.options || question.options.length === 0) {
-    return (
-      <p className="text-red-500">No options available for this question.</p>
-    );
+    return <p className="text-red-500">No options available for this question.</p>;
   }
 
   return (
@@ -265,8 +259,7 @@ export const MultipleChoice: React.FC<QuestionProps> = ({
       {showExplanation && question.explanation && (
         <div className="mt-4 p-4 bg-blue-50 rounded-lg">
           <p className="text-sm text-blue-800">
-            <span className="font-semibold">Explanation:</span>{" "}
-            {question.explanation}
+            <span className="font-semibold">Explanation:</span> {question.explanation}
           </p>
         </div>
       )}
@@ -317,8 +310,7 @@ export const TrueFalse: React.FC<QuestionProps> = ({
       {showExplanation && question.explanation && (
         <div className="mt-4 p-4 bg-blue-50 rounded-lg">
           <p className="text-sm text-blue-800">
-            <span className="font-semibold">Explanation:</span>{" "}
-            {question.explanation}
+            <span className="font-semibold">Explanation:</span> {question.explanation}
           </p>
         </div>
       )}
@@ -332,20 +324,34 @@ export const ShortAnswer: React.FC<QuestionProps> = ({
   handleAnswer,
   showExplanation,
 }) => {
-  const [localValue, setLocalValue] = useState(answers[question.id] || "");
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    setLocalValue(answers[question.id] || "");
-  }, [answers, question.id]);
+  const handleInputChange = (event: React.FormEvent<HTMLTextAreaElement>) => {
+    // Capture the value immediately
+    const value = event.currentTarget.value;
 
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = e.target.value;
-    setLocalValue(newValue);
-    handleAnswer(question.id, newValue);
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // Set a new timeout to update the answer with the captured value
+    timeoutRef.current = setTimeout(() => {
+      handleAnswer(question.id, value);
+    }, 100);
   };
 
+  // Cleanup timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
-    <div>
+    <div className="space-y-4">
       {question.image_url && (
         <div className="mb-4">
           <Image
@@ -360,18 +366,19 @@ export const ShortAnswer: React.FC<QuestionProps> = ({
       )}
 
       <textarea
-        className="w-full p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-        rows={4}
-        value={localValue}
-        onChange={handleChange}
+        name={`question-${question.id}`}
+        defaultValue={answers[question.id] || ''}
+        onInput={handleInputChange}
+        className="w-full min-h-[120px] p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
         placeholder="Type your answer here..."
+        spellCheck={false}
+        autoComplete="off"
       />
 
       {showExplanation && question.explanation && (
         <div className="mt-4 p-4 bg-blue-50 rounded-lg">
           <p className="text-sm text-blue-800">
-            <span className="font-semibold">Explanation:</span>{" "}
-            {question.explanation}
+            <span className="font-semibold">Explanation:</span> {question.explanation}
           </p>
         </div>
       )}
@@ -404,9 +411,7 @@ export const MultipleSelection: React.FC<QuestionProps> = ({
   };
 
   if (!question.options || question.options.length === 0) {
-    return (
-      <p className="text-red-500">No options available for this question.</p>
-    );
+    return <p className="text-red-500">No options available for this question.</p>;
   }
 
   return (
@@ -446,8 +451,7 @@ export const MultipleSelection: React.FC<QuestionProps> = ({
       {showExplanation && question.explanation && (
         <div className="mt-4 p-4 bg-blue-50 rounded-lg">
           <p className="text-sm text-blue-800">
-            <span className="font-semibold">Explanation:</span>{" "}
-            {question.explanation}
+            <span className="font-semibold">Explanation:</span> {question.explanation}
           </p>
         </div>
       )}
@@ -534,8 +538,6 @@ export const formatAnswer = (
   }
 };
 
-export type { QuestionProps };
-
 // Helper to validate drag-drop answers
 export const validateDragDropAnswer = (
   userAnswers: string[],
@@ -550,6 +552,7 @@ export const validateDragDropAnswer = (
       answer.toLowerCase() === correctAnswers[index].toLowerCase()
   );
 };
+
 // Custom hook for handling drag-drop state
 export const useDragDropState = (
   initialAnswers: string[] = [],
@@ -607,3 +610,25 @@ export const shuffleAnswers = (answers: string[]): string[] => {
   }
   return shuffled;
 };
+
+// Create a named object for all exports
+const QuestionTypeComponents = {
+  MultipleChoice,
+  TrueFalse,
+  ShortAnswer,
+  MultipleSelection,
+  DragDrop,
+  QuestionTypes,
+  isAnswerComplete,
+  formatAnswer,
+  validateDragDropAnswer,
+  useDragDropState,
+  prepareDragDropQuestion,
+  shuffleAnswers,
+};
+
+// Export the named object as default
+export default QuestionTypeComponents;
+
+// Export individual components and types
+export type { QuestionProps };

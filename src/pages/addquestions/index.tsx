@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/router";
 import TeacherLayout from "@/comps/teacher-layout";
 import { createClient } from "../../../utils/supabase/component";
@@ -47,146 +47,6 @@ interface Question {
   drag_drop_answers?: string[];
 }
 
-const DragDropInputs: React.FC<{
-  currentQuestion: Question;
-  setCurrentQuestion: (question: Question) => void;
-}> = ({ currentQuestion, setCurrentQuestion }) => {
-  const [dragDropAnswers, setDragDropAnswers] = useState<string[]>([]);
-  const [answerInput, setAnswerInput] = useState("");
-  const textAreaRef = React.useRef<HTMLTextAreaElement>(null);
-
-  const handleAddAnswer = () => {
-    if (answerInput.trim()) {
-      const newAnswers = [...dragDropAnswers, answerInput.trim()];
-      setDragDropAnswers(newAnswers);
-      setAnswerInput("");
-
-      setCurrentQuestion({
-        ...currentQuestion,
-        drag_drop_answers: newAnswers,
-        correct_answer: JSON.stringify(newAnswers),
-      });
-    }
-  };
-
-  const handleRemoveAnswer = (index: number) => {
-    const newAnswers = dragDropAnswers.filter((_, i) => i !== index);
-    setDragDropAnswers(newAnswers);
-
-    setCurrentQuestion({
-      ...currentQuestion,
-      drag_drop_answers: newAnswers,
-      correct_answer: JSON.stringify(newAnswers),
-    });
-  };
-
-  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value;
-    const segments = text.split("[blank]");
-
-    setCurrentQuestion({
-      ...currentQuestion,
-      text: text,
-      drag_drop_text: segments,
-      options: undefined,
-    });
-  };
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Question Text
-        </label>
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 mb-2">
-            <button
-              type="button"
-              onClick={() => {
-                if (!textAreaRef.current) return;
-                const textarea = textAreaRef.current;
-                const start = textarea.selectionStart;
-                const end = textarea.selectionEnd;
-                const text = textarea.value;
-                const newText =
-                  text.slice(0, start) + "[blank]" + text.slice(end);
-                handleTextChange({
-                  target: { value: newText },
-                } as React.ChangeEvent<HTMLTextAreaElement>);
-              }}
-              className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
-            >
-              Insert Blank
-            </button>
-            <span className="text-sm text-gray-500">
-              Click where you want to add a blank answer space
-            </span>
-          </div>
-          <textarea
-            ref={textAreaRef}
-            value={currentQuestion.text}
-            onChange={handleTextChange}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            rows={4}
-            placeholder="Example: The capital of France is [blank] and it is known as the [blank] of Love."
-          />
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Add Answers
-        </label>
-        <div className="space-y-4">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={answerInput}
-              onChange={(e) => setAnswerInput(e.target.value)}
-              className="flex-1 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Type an answer"
-              onKeyPress={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleAddAnswer();
-                }
-              }}
-            />
-            <button
-              type="button"
-              onClick={handleAddAnswer}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Add
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {dragDropAnswers.map((answer, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-gray-500">{index + 1}.</span>
-                  <span className="text-gray-700">{answer}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveAnswer(index)}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  <MinusCircle size={20} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const AddQuestions: React.FC = () => {
   const router = useRouter();
   const { quizId } = router.query;
@@ -202,11 +62,12 @@ const AddQuestions: React.FC = () => {
   const [quizTitle, setQuizTitle] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const supabase = createClient();
 
-  const fetchQuizTitle = async () => {
+  const fetchQuizTitle = useCallback(async () => {
     if (!quizId) return;
     
     const { data, error } = await supabase
@@ -220,9 +81,9 @@ const AddQuestions: React.FC = () => {
     } else if (data) {
       setQuizTitle(data.title);
     }
-  };
+  }, [quizId, supabase]);
 
-  const fetchQuestions = async () => {
+  const fetchQuestions = useCallback(async () => {
     if (!quizId) return;
     
     setIsLoading(true);
@@ -252,7 +113,7 @@ const AddQuestions: React.FC = () => {
       setQuestions(parsedQuestions);
     }
     setIsLoading(false);
-  };
+  }, [quizId, supabase]);
 
   useEffect(() => {
     const initializeQuiz = async () => {
@@ -263,7 +124,7 @@ const AddQuestions: React.FC = () => {
     };
 
     initializeQuiz();
-  }, [quizId]);
+  }, [quizId, fetchQuizTitle, fetchQuestions]);
 
   const handleQuestionTypeChange = (type: string) => {
     let newQuestion: Question = {
@@ -317,7 +178,6 @@ const AddQuestions: React.FC = () => {
 
     setCurrentQuestion(newQuestion);
   };
-
   const handleInputChange = (field: keyof Question, value: string) => {
     setCurrentQuestion({ ...currentQuestion, [field]: value });
   };
@@ -342,7 +202,14 @@ const AddQuestions: React.FC = () => {
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setImageFile(e.target.files[0]);
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      
+      reader.onloadend = () => {
+        setImageUrl(reader.result as string);
+      };
+      
+      reader.readAsDataURL(file);
     }
   };
 
@@ -367,31 +234,11 @@ const AddQuestions: React.FC = () => {
         throw new Error("Quiz ID is not available or invalid");
       }
 
-      let image_url = null;
-      if (imageFile) {
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("question-images")
-          .upload(`${quizId}/${Date.now()}-${imageFile.name}`, imageFile);
-
-        if (uploadError) throw uploadError;
-
-        if (uploadData) {
-          const {
-            data: { publicUrl },
-          } = supabase.storage
-            .from("question-images")
-            .getPublicUrl(uploadData.path);
-
-          image_url = publicUrl;
-        }
-      }
-
-      // Prepare question data based on type
       let questionData: DatabaseQuestion = {
         quiz_id: quizId,
         type: currentQuestion.type as DatabaseQuestion["type"],
         text: currentQuestion.text,
-        image_url,
+        image_url: imageUrl, // Store the base64 image directly
         explanation: currentQuestion.explanation || null,
         options: null,
         correct_answer: currentQuestion.correct_answer,
@@ -405,183 +252,355 @@ const AddQuestions: React.FC = () => {
           ...questionData,
           drag_drop_text: currentQuestion.drag_drop_text || [],
           drag_drop_answers: currentQuestion.drag_drop_answers || [],
-          correct_answer: JSON.stringify(
-            currentQuestion.drag_drop_answers || []
-          ),
+          correct_answer: JSON.stringify(currentQuestion.drag_drop_answers || []),
         };
       } else if (currentQuestion.type === "multiple-selection") {
         questionData = {
           ...questionData,
-          options: currentQuestion.options
-            ? JSON.stringify(currentQuestion.options)
-            : null,
-          multiple_correct_answers:
-            currentQuestion.multiple_correct_answers || [],
-          correct_answer: JSON.stringify(
-            currentQuestion.multiple_correct_answers || []
-          ),
+          options: currentQuestion.options ? JSON.stringify(currentQuestion.options) : null,
+          multiple_correct_answers: currentQuestion.multiple_correct_answers || [],
+          correct_answer: JSON.stringify(currentQuestion.multiple_correct_answers || []),
         };
       } else {
         questionData = {
           ...questionData,
-          options: currentQuestion.options
-          ? JSON.stringify(currentQuestion.options)
-          : null,
-        correct_answer: currentQuestion.correct_answer,
-      };
-    }
-
-    const { data, error } = await supabase
-      .from("questions")
-      .insert([questionData])
-      .select();
-
-    if (error) throw error;
-
-    if (data) {
-      let newQuestion;
-      if (data[0].type === "drag-drop") {
-        newQuestion = {
-          ...data[0],
-          dragDropText: data[0].drag_drop_text,
-          dragDropAnswers: data[0].drag_drop_answers,
-        };
-      } else {
-        newQuestion = {
-          ...data[0],
-          options: data[0].options ? JSON.parse(data[0].options) : undefined,
+          options: currentQuestion.options ? JSON.stringify(currentQuestion.options) : null,
+          correct_answer: currentQuestion.correct_answer,
         };
       }
 
-      setQuestions([...questions, newQuestion]);
-      setCurrentQuestion({
-        type: "multiple-choice",
-        text: "",
-        options: ["", ""],
-        correct_answer: "",
-        explanation: "",
-        multiple_correct_answers: [],
-      });
-      setImageFile(null);
+      const { data, error } = await supabase
+        .from("questions")
+        .insert([questionData])
+        .select();
+
+      if (error) throw error;
+
+      if (data) {
+        let newQuestion;
+        if (data[0].type === "drag-drop") {
+          newQuestion = {
+            ...data[0],
+            dragDropText: data[0].drag_drop_text,
+            dragDropAnswers: data[0].drag_drop_answers,
+          };
+        } else {
+          newQuestion = {
+            ...data[0],
+            options: data[0].options ? JSON.parse(data[0].options) : undefined,
+          };
+        }
+
+        setQuestions([...questions, newQuestion]);
+        
+        // Reset form and image
+        setCurrentQuestion({
+          type: "multiple-choice",
+          text: "",
+          options: ["", ""],
+          correct_answer: "",
+          explanation: "",
+          multiple_correct_answers: [],
+        });
+        setImageUrl(null);
+      }
+    } catch (error) {
+      console.error("Error adding question:", error);
+      alert("Failed to add question. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-  } catch (error) {
-    console.error("Error adding question:", error);
-    alert("Failed to add question. Please try again.");
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
-const renderMultipleChoiceInputs = () => (
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">
-      Options
-    </label>
-    <div className="space-y-2">
-      {currentQuestion.options?.map((option, index) => (
-        <div key={index} className="flex items-center">
+  const DragDropInputs: React.FC<{
+    currentQuestion: Question;
+    setCurrentQuestion: (question: Question) => void;
+  }> = ({ currentQuestion, setCurrentQuestion }) => {
+    const [dragDropAnswers, setDragDropAnswers] = useState<string[]>([]);
+    const [answerInput, setAnswerInput] = useState("");
+    const textAreaRef = useRef<HTMLTextAreaElement>(null);
+
+    const handleAddAnswer = () => {
+      if (answerInput.trim()) {
+        const newAnswers = [...dragDropAnswers, answerInput.trim()];
+        setDragDropAnswers(newAnswers);
+        setAnswerInput("");
+
+        setCurrentQuestion({
+          ...currentQuestion,
+          drag_drop_answers: newAnswers,
+          correct_answer: JSON.stringify(newAnswers),
+        });
+      }
+    };
+
+    const handleRemoveAnswer = (index: number) => {
+      const newAnswers = dragDropAnswers.filter((_, i) => i !== index);
+      setDragDropAnswers(newAnswers);
+
+      setCurrentQuestion({
+        ...currentQuestion,
+        drag_drop_answers: newAnswers,
+        correct_answer: JSON.stringify(newAnswers),
+      });
+    };
+
+    const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const text = e.target.value;
+      const segments = text.split("[blank]");
+
+      setCurrentQuestion({
+        ...currentQuestion,
+        text: text,
+        drag_drop_text: segments,
+        options: undefined,
+      });
+    };
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Question Text
+          </label>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!textAreaRef.current) return;
+                  const textarea = textAreaRef.current;
+                  const start = textarea.selectionStart;
+                  const end = textarea.selectionEnd;
+                  const text = textarea.value;
+                  const newText =
+                    text.slice(0, start) + "[blank]" + text.slice(end);
+                  handleTextChange({
+                    target: { value: newText },
+                  } as React.ChangeEvent<HTMLTextAreaElement>);
+                }}
+                className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+              >
+                Insert Blank
+              </button>
+              <span className="text-sm text-gray-500">
+                Click where you want to add a blank answer space
+              </span>
+            </div>
+            <textarea
+              ref={textAreaRef}
+              value={currentQuestion.text}
+              onChange={handleTextChange}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              rows={4}
+              placeholder="Example: The capital of France is [blank] and it is known as the [blank] of Love."
+            />
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Add Answers
+          </label>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={answerInput}
+                onChange={(e) => setAnswerInput(e.target.value)}
+                className="flex-1 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Type an answer"
+                onKeyPress={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddAnswer();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleAddAnswer}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Add
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {dragDropAnswers.map((answer, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-500">{index + 1}.</span>
+                    <span className="text-gray-700">{answer}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAnswer(index)}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <MinusCircle size={20} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  const renderImageUpload = () => (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Question Image (optional)
+      </label>
+      <div className="flex items-center space-x-4 mb-6">
+        {imageUrl ? (
+          <Image 
+            src={imageUrl}
+            alt="Question"
+            width={64}
+            height={64}
+            className="rounded object-cover"
+          />
+        ) : (
+          <ImageIcon className="h-16 w-16 text-gray-300" />
+        )}
+        <div>
           <input
-            type="text"
-            value={option}
-            onChange={(e) => handleOptionChange(index, e.target.value)}
-            className="flex-grow p-2 border border-gray-300 rounded-l-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder={`Option ${index + 1}`}
-            required
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+            ref={fileInputRef}
+            className="hidden"
           />
           <button
             type="button"
-            onClick={() => removeOption(index)}
-            className="p-2 bg-red-100 text-red-600 rounded-r-md hover:bg-red-200"
+            onClick={() => fileInputRef.current?.click()}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-300"
           >
-            <MinusCircle size={20} />
+            Choose Image
           </button>
+          {imageUrl && (
+            <button
+              type="button"
+              onClick={() => setImageUrl(null)}
+              className="ml-2 text-sm text-red-600 hover:text-red-500"
+            >
+              Remove
+            </button>
+          )}
         </div>
-      ))}
+      </div>
     </div>
-    <button
-      type="button"
-      onClick={addOption}
-      className="mt-2 flex items-center px-3 py-2 bg-green-100 text-green-600 rounded-md hover:bg-green-200"
-    >
-      <PlusCircle size={20} className="mr-2" />
-      Add Option
-    </button>
-  </div>
-);
+  );
 
-const renderMultipleSelectionInputs = () => (
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">
-      Options and Correct Answers
-    </label>
-    <div className="space-y-2">
-      {currentQuestion.options?.map((option, index) => (
-        <div key={index} className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={currentQuestion.multiple_correct_answers?.includes(
-              option
-            )}
-            onChange={(e) => {
-              const newAnswers = e.target.checked
-                ? [
-                    ...(currentQuestion.multiple_correct_answers || []),
-                    option,
-                  ]
-                : (currentQuestion.multiple_correct_answers || []).filter(
-                    (a) => a !== option
-                  );
-              setCurrentQuestion({
-                ...currentQuestion,
-                multiple_correct_answers: newAnswers,
-                correct_answer: JSON.stringify(newAnswers),
-              });
-            }}
-            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-          />
-          <input
-            type="text"
-            value={option}
-            onChange={(e) => handleOptionChange(index, e.target.value)}
-            className="flex-grow p-2 border border-gray-300 rounded-l-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder={`Option ${index + 1}`}
-            required
-          />
-          <button
-            type="button"
-            onClick={() => removeOption(index)}
-            className="p-2 bg-red-100 text-red-600 rounded-r-md hover:bg-red-200"
-          >
-            <MinusCircle size={20} />
-          </button>
-        </div>
-      ))}
+  const renderMultipleChoiceInputs = () => (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Options
+      </label>
+      <div className="space-y-2">
+        {currentQuestion.options?.map((option, index) => (
+          <div key={index} className="flex items-center">
+            <input
+              type="text"
+              value={option}
+              onChange={(e) => handleOptionChange(index, e.target.value)}
+              className="flex-grow p-2 border border-gray-300 rounded-l-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder={`Option ${index + 1}`}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => removeOption(index)}
+              className="p-2 bg-red-100 text-red-600 rounded-r-md hover:bg-red-200"
+            >
+              <MinusCircle size={20} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={addOption}
+        className="mt-2 flex items-center px-3 py-2 bg-green-100 text-green-600 rounded-md hover:bg-green-200"
+      >
+        <PlusCircle size={20} className="mr-2" />
+        Add Option
+      </button>
     </div>
-    <button
-      type="button"
-      onClick={addOption}
-      className="mt-2 flex items-center px-3 py-2 bg-green-100 text-green-600 rounded-md hover:bg-green-200"
-    >
-      <PlusCircle size={20} className="mr-2" />
-      Add Option
-    </button>
-  </div>
-);
+  );
 
-const renderQuestionList = () => {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.2 }}
-      className="bg-white rounded-lg shadow-lg p-6"
-    >
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">
-        Added Questions
-      </h2>
-      <div className="space-y-4">
-        {questions.map((q, index) => (
-          <motion.div
+  const renderMultipleSelectionInputs = () => (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Options and Correct Answers
+      </label>
+      <div className="space-y-2">
+        {currentQuestion.options?.map((option, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={currentQuestion.multiple_correct_answers?.includes(option)}
+              onChange={(e) => {
+                const newAnswers = e.target.checked
+                  ? [...(currentQuestion.multiple_correct_answers || []), option]
+                  : (currentQuestion.multiple_correct_answers || []).filter(
+                      (a) => a !== option
+                    );
+                setCurrentQuestion({
+                  ...currentQuestion,
+                  multiple_correct_answers: newAnswers,
+                  correct_answer: JSON.stringify(newAnswers),
+                });
+              }}
+              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <input
+              type="text"
+              value={option}
+              onChange={(e) => handleOptionChange(index, e.target.value)}
+              className="flex-grow p-2 border border-gray-300 rounded-l-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder={`Option ${index + 1}`}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => removeOption(index)}
+              className="p-2 bg-red-100 text-red-600 rounded-r-md hover:bg-red-200"
+            >
+              <MinusCircle size={20} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={addOption}
+        className="mt-2 flex items-center px-3 py-2 bg-green-100 text-green-600 rounded-md hover:bg-green-200"
+      >
+        <PlusCircle size={20} className="mr-2" />
+        Add Option
+      </button>
+    </div>
+  );
+  const renderQuestionList = () => {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="bg-white rounded-lg shadow-lg p-6"
+      >
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">
+          Added Questions
+        </h2>
+        <div className="space-y-4">
+          {questions.map((q, index) => (
+            <motion.div
             key={q.id}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -622,9 +641,9 @@ const renderQuestionList = () => {
                 <Image
                   src={q.image_url}
                   alt="Question image"
-                  width={200}
-                  height={200}
-                  objectFit="contain"
+                  width={128}
+                  height={128}
+                  className="object-cover rounded"
                 />
               </div>
             )}
@@ -671,226 +690,7 @@ const renderQuestionList = () => {
     </motion.div>
   );
 };
-const renderQuestionForm = () => {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="bg-white rounded-lg shadow-lg p-6 mb-8"
-    >
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">
-        Add New Question
-      </h2>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label
-              htmlFor="questionType"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Question Type
-            </label>
-            <select
-              id="questionType"
-              value={currentQuestion.type}
-              onChange={(e) => handleQuestionTypeChange(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="multiple-choice">Multiple Choice</option>
-              <option value="true-false">True/False</option>
-              <option value="short-answer">Short Answer</option>
-              <option value="multiple-selection">Multiple Selection</option>
-              <option value="drag-drop">Drag and Drop</option>
-            </select>
-          </div>
 
-          {currentQuestion.type !== "drag-drop" && (
-            <div>
-              <label
-                htmlFor="correctAnswer"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Correct Answer
-              </label>
-              {currentQuestion.type === "multiple-choice" ? (
-                <select
-                  id="correctAnswer"
-                  value={currentQuestion.correct_answer}
-                  onChange={(e) =>
-                    handleInputChange("correct_answer", e.target.value)
-                  }
-                  className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                >
-                  <option value="">Select correct answer</option>
-                  {currentQuestion.options?.map((option, index) => (
-                    <option key={index} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              ) : currentQuestion.type === "true-false" ? (
-                <div className="flex space-x-4">
-                  {["True", "False"].map((value) => (
-                    <label key={value} className="inline-flex items-center">
-                      <input
-                        type="radio"
-                        value={value.toLowerCase()}
-                        checked={
-                          currentQuestion.correct_answer ===
-                          value.toLowerCase()
-                        }
-                        onChange={(e) =>
-                          handleInputChange("correct_answer", e.target.value)
-                        }
-                        className="form-radio h-4 w-4 text-blue-600"
-                      />
-                      <span className="ml-2">{value}</span>
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <input
-                  type="text"
-                  id="correctAnswer"
-                  value={currentQuestion.correct_answer}
-                  onChange={(e) =>
-                    handleInputChange("correct_answer", e.target.value)
-                  }
-                  className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              )}
-            </div>
-          )}
-        </div>
-
-        {currentQuestion.type === "drag-drop" ? (
-          <DragDropInputs
-            currentQuestion={currentQuestion}
-            setCurrentQuestion={setCurrentQuestion}
-          />
-        ) : (
-          <div>
-            <label
-              htmlFor="questionText"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Question Text
-            </label>
-            <textarea
-              id="questionText"
-              value={currentQuestion.text}
-              onChange={(e) => handleInputChange("text", e.target.value)}
-              rows={3}
-              className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
-            />
-          </div>
-        )}
-
-        {/* Image Upload */}
-        <div>
-          <label
-            htmlFor="questionImage"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Question Image (optional)
-          </label>
-          <div className="mt-1 flex items-center">
-            <span className="inline-block h-12 w-12 rounded-full overflow-hidden bg-gray-100">
-              {imageFile ? (
-                <img
-                  src={URL.createObjectURL(imageFile)}
-                  alt="Preview"
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <ImageIcon className="h-full w-full text-gray-300" />
-              )}
-            </span>
-            <label
-              htmlFor="file-upload"
-              className="ml-5 bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm leading-4 font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <span>Upload a file</span>
-              <input
-                id="file-upload"
-                name="file-upload"
-                type="file"
-                className="sr-only"
-                accept="image/*"
-                onChange={handleImageChange}
-              />
-            </label>
-          </div>
-        </div>
-
-        {currentQuestion.type === "multiple-choice" &&
-          renderMultipleChoiceInputs()}
-        {currentQuestion.type === "multiple-selection" &&
-          renderMultipleSelectionInputs()}
-
-        <div>
-          <label
-            htmlFor="explanation"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Explanation for Correct Answer
-          </label>
-          <textarea
-            id="explanation"
-            value={currentQuestion.explanation}
-            onChange={(e) => handleInputChange("explanation", e.target.value)}
-            rows={3}
-            className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            required
-          />
-        </div>
-
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm disabled:opacity-50 flex items-center"
-          >
-            {isSubmitting ? (
-              <>
-                <svg
-                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Adding...
-              </>
-            ) : (
-              <>
-                <Check size={20} className="mr-2" />
-                Add Question
-              </>
-            )}
-          </button>
-        </div>
-      </form>
-    </motion.div>
-  );
-};
 if (isLoading) {
   return (
     <TeacherLayout>
@@ -907,7 +707,187 @@ return (
       <h1 className="text-3xl font-bold text-gray-800 mb-8">
         Add Questions to {quizTitle}
       </h1>
-      {renderQuestionForm()}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="bg-white rounded-lg shadow-lg p-6 mb-8"
+      >
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">
+          Add New Question
+        </h2>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label
+                htmlFor="questionType"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Question Type
+              </label>
+              <select
+                id="questionType"
+                value={currentQuestion.type}
+                onChange={(e) => handleQuestionTypeChange(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="multiple-choice">Multiple Choice</option>
+                <option value="true-false">True/False</option>
+                <option value="short-answer">Short Answer</option>
+                <option value="multiple-selection">Multiple Selection</option>
+                <option value="drag-drop">Drag and Drop</option>
+              </select>
+            </div>
+
+            {currentQuestion.type !== "drag-drop" && (
+              <div>
+                <label
+                  htmlFor="correctAnswer"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Correct Answer
+                </label>
+                {currentQuestion.type === "multiple-choice" ? (
+                  <select
+                    id="correctAnswer"
+                    value={currentQuestion.correct_answer}
+                    onChange={(e) =>
+                      handleInputChange("correct_answer", e.target.value)
+                    }
+                    className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select correct answer</option>
+                    {currentQuestion.options?.map((option, index) => (
+                      <option key={index} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                ) : currentQuestion.type === "true-false" ? (
+                  <div className="flex space-x-4">
+                    {["True", "False"].map((value) => (
+                      <label key={value} className="inline-flex items-center">
+                        <input
+                          type="radio"
+                          value={value.toLowerCase()}
+                          checked={
+                            currentQuestion.correct_answer ===
+                            value.toLowerCase()
+                          }
+                          onChange={(e) =>
+                            handleInputChange("correct_answer", e.target.value)
+                          }
+                          className="form-radio h-4 w-4 text-blue-600"
+                        />
+                        <span className="ml-2">{value}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    id="correctAnswer"
+                    value={currentQuestion.correct_answer}
+                    onChange={(e) =>
+                      handleInputChange("correct_answer", e.target.value)
+                    }
+                    className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                )}
+              </div>
+            )}
+          </div>
+
+          {currentQuestion.type === "drag-drop" ? (
+            <DragDropInputs
+              currentQuestion={currentQuestion}
+              setCurrentQuestion={setCurrentQuestion}
+            />
+          ) : (
+            <div>
+              <label
+                htmlFor="questionText"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Question Text
+              </label>
+              <textarea
+                id="questionText"
+                value={currentQuestion.text}
+                onChange={(e) => handleInputChange("text", e.target.value)}
+                rows={3}
+                className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          )}
+
+          {renderImageUpload()}
+
+          {currentQuestion.type === "multiple-choice" &&
+            renderMultipleChoiceInputs()}
+          {currentQuestion.type === "multiple-selection" &&
+            renderMultipleSelectionInputs()}
+
+          <div>
+            <label
+              htmlFor="explanation"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Explanation for Correct Answer
+            </label>
+            <textarea
+              id="explanation"
+              value={currentQuestion.explanation}
+              onChange={(e) => handleInputChange("explanation", e.target.value)}
+              rows={3}
+              className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm disabled:opacity-50 flex items-center"
+            >
+              {isSubmitting ? (
+                <>
+                  <svg
+                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <Check size={20} className="mr-2" />
+                  Add Question
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </motion.div>
       {questions.length > 0 && renderQuestionList()}
       <div className="mt-8 flex justify-end space-x-4">
         <button

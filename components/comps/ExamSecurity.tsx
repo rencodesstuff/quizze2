@@ -1,7 +1,9 @@
-// ExamSecurity.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '../../utils/supabase/component';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, AlertTriangle } from 'lucide-react';
+import { useRouter } from 'next/router';
+import ErrorModal from '@/comps/ErrorModal';
+import Modal from '@/comps/Modal';
 
 interface ExamSecurityWrapperProps {
   children: React.ReactNode;
@@ -10,6 +12,13 @@ interface ExamSecurityWrapperProps {
   studentName: string;
   quizTitle: string;
   strictMode: boolean;
+  onForceSubmit?: () => Promise<void>;
+}
+
+interface SecurityError {
+  title: string;
+  message: string;
+  type: 'error' | 'warning';
 }
 
 const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({ 
@@ -18,14 +27,152 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
   teacherId,
   studentName,
   quizTitle,
-  strictMode
+  strictMode,
+  onForceSubmit
 }) => {
+  const router = useRouter();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isBlurred, setIsBlurred] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
   const [violationCount, setViolationCount] = useState(0);
   const [needsUserAction, setNeedsUserAction] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<SecurityError | null>(null);
   const supabase = createClient();
+
+  const handleError = useCallback((error: SecurityError) => {
+    console.error(`Security Error: ${error.title}`, error);
+    setError(error);
+  }, []);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  const handleSecurityViolation = useCallback(async (violationType: string) => {
+    if (!strictMode) return;
+    
+    try {
+      const newViolationCount = violationCount + 1;
+      setViolationCount(newViolationCount);
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        throw {
+          title: 'Authentication Error',
+          message: 'Unable to verify user identity. Please refresh the page and try again.',
+          type: 'error'
+        };
+      }
+
+      if (!user) {
+        throw {
+          title: 'Session Error',
+          message: 'No active session found. Please log in again.',
+          type: 'error'
+        };
+      }
+
+      const { error: violationError } = await supabase.from('quiz_security_violations').insert({
+        quiz_id: quizId,
+        student_id: user.id,
+        violation_type: violationType,
+        student_name: studentName,
+        quiz_title: quizTitle
+      });
+
+      if (violationError) {
+        throw {
+          title: 'Security Warning',
+          message: 'Failed to record security violation. This incident will be reported.',
+          type: 'warning'
+        };
+      }
+
+      const channel = supabase.channel('security-violations');
+      await channel.send({
+        type: 'broadcast',
+        event: 'security_violation',
+        payload: {
+          quiz_id: quizId,
+          student_name: studentName,
+          violation_type: violationType,
+          teacher_id: teacherId,
+          violation_count: newViolationCount
+        }
+      });
+
+      if (newViolationCount >= 3) {
+        await handleForcedSubmission();
+      }
+    } catch (error) {
+      handleError(error as SecurityError);
+    }
+  }, [quizId, teacherId, studentName, quizTitle, strictMode, violationCount, supabase, handleError]);
+
+  const handleForcedSubmission = useCallback(async () => {
+    if (isSubmitting) return;
+    
+    try {
+      setIsSubmitting(true);
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        throw {
+          title: 'Submission Error',
+          message: 'Authentication failed during submission. Please contact your instructor.',
+          type: 'error'
+        };
+      }
+
+      if (!user) {
+        throw {
+          title: 'Session Error',
+          message: 'Session expired during submission. Your progress may be lost.',
+          type: 'error'
+        };
+      }
+
+      const { error: submissionError } = await supabase.from('quiz_submissions').insert({
+        student_id: user.id,
+        quiz_id: quizId,
+        answers: {},
+        score: 0,
+        total_questions: 0,
+        correct_answers: 0
+      });
+
+      if (submissionError) {
+        throw {
+          title: 'Submission Failed',
+          message: 'Failed to submit quiz due to multiple security violations. Contact your instructor.',
+          type: 'error'
+        };
+      }
+
+      const { error: violationError } = await supabase.from('quiz_security_violations').insert({
+        quiz_id: quizId,
+        student_id: user.id,
+        violation_type: 'max_violations_reached',
+        student_name: studentName,
+        quiz_title: quizTitle
+      });
+
+      if (violationError) {
+        handleError({
+          title: 'Warning',
+          message: 'Failed to log final violation. The incident has been recorded.',
+          type: 'warning'
+        });
+      }
+
+      router.push('/stdinbox');
+    } catch (error) {
+      handleError(error as SecurityError);
+    }
+  }, [isSubmitting, quizId, studentName, quizTitle, supabase, router, handleError]);
 
   useEffect(() => {
     if (!strictMode) return;
@@ -47,7 +194,6 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
     };
 
     const handleFocus = () => {
-      // Only remove blur if user has acknowledged the warning
       if (!needsUserAction) {
         setIsBlurred(false);
         setShowWarning(false);
@@ -72,40 +218,7 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [strictMode, needsUserAction]);
-
-  const handleSecurityViolation = async (violationType: string) => {
-    if (!strictMode) return;
-    
-    setViolationCount(prev => prev + 1);
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("No authenticated user found");
-
-      await supabase.from('quiz_security_violations').insert({
-        quiz_id: quizId,
-        student_id: user.id,
-        violation_type: violationType,
-        student_name: studentName,
-        quiz_title: quizTitle
-      });
-
-      const channel = supabase.channel('security-violations');
-      channel.send({
-        type: 'broadcast',
-        event: 'security_violation',
-        payload: {
-          quiz_id: quizId,
-          student_name: studentName,
-          violation_type: violationType,
-          teacher_id: teacherId
-        }
-      });
-    } catch (error) {
-      console.error('Error logging security violation:', error);
-    }
-  };
+  }, [strictMode, needsUserAction, handleSecurityViolation]);
 
   const enterFullscreen = () => {
     if (document.documentElement.requestFullscreen) {
@@ -139,34 +252,29 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
 
   return (
     <div className="relative">
-      {/* Quiz content with conditional blur */}
       <div className={`transition-all duration-300 ${(isBlurred || needsUserAction) ? 'blur-sm' : ''}`}>
         {children}
       </div>
       
-      {/* Warning modal - stays visible until user explicitly dismisses it */}
+      {/* Security Warning Modal */}
       {(showWarning || needsUserAction) && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md">
-            <div className="flex items-center text-red-600 mb-4">
-              <AlertCircle className="w-6 h-6 mr-2" />
-              <h2 className="text-xl font-bold">Security Warning</h2>
-            </div>
-            <p className="text-gray-700 mb-4">
-              You have left the quiz page. This incident has been recorded. 
-              {violationCount > 1 && " Multiple violations may result in quiz termination."}
-              {violationCount > 2 && " This is your final warning."}
-            </p>
-            <div className="flex justify-end space-x-4">
-              <button
-                onClick={handleReturnToQuiz}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors duration-150"
-              >
-                Return to Quiz
-              </button>
-            </div>
-          </div>
-        </div>
+        <Modal
+          isOpen={true}
+          onClose={handleReturnToQuiz}
+          title="Security Warning"
+          message={`You have left the quiz page. This is violation ${violationCount} of 3. 
+            ${violationCount === 2 ? 'This is your final warning!' : ''}
+            ${violationCount >= 3 ? 'Maximum violations reached. Your quiz will be automatically submitted with a score of 0.' : 'Please return to the quiz immediately.'}`}
+          isError={violationCount >= 2}
+        />
+      )}
+
+      {/* Error Modal */}
+      {error && (
+        <ErrorModal
+          message={error.message}
+          onClose={clearError}
+        />
       )}
     </div>
   );
