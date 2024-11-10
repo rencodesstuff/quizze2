@@ -31,6 +31,9 @@ interface BaseQuestion {
   image_url?: string;
   explanation?: string;
   multiple_correct_answers?: string[];
+  // Add both database and frontend property names
+  drag_drop_text?: string[];
+  drag_drop_answers?: string[];
   dragDropText?: string[];
   dragDropAnswers?: string[];
 }
@@ -132,7 +135,7 @@ const TakeQuiz: React.FC = () => {
               id, title, duration_minutes, release_date, 
               randomize_arrangement, strict_mode, teacher_id,
               questions (id, type, text, options, correct_answer, image_url,
-                      explanation, multiple_correct_answers)
+                      explanation, multiple_correct_answers, drag_drop_text, drag_drop_answers)
             `
             )
             .eq("id", id)
@@ -156,6 +159,10 @@ const TakeQuiz: React.FC = () => {
           (q: BaseQuestion) => ({
             ...q,
             options: validateQuestionOptions(q),
+            dragDropAnswers:
+              q.type === "drag-drop" ? q.drag_drop_answers || [] : undefined,
+            dragDropText:
+              q.type === "drag-drop" ? q.drag_drop_text || [] : undefined,
           })
         );
 
@@ -168,6 +175,10 @@ const TakeQuiz: React.FC = () => {
           questions: validatedQuestions,
         });
         setTimeLeft(quizData.data.duration_minutes * 60);
+
+        // Remove the initialization of drag-drop answers
+        const initialAnswers: Answers = {};
+        setAnswers(initialAnswers);
       } catch (error) {
         setErrorMessage(
           `An error occurred while loading the quiz: ${
@@ -180,7 +191,6 @@ const TakeQuiz: React.FC = () => {
     fetchQuizAndStudentInfo();
   }, [id]);
 
-  // Timer effect
   useEffect(() => {
     if (timeLeft === null || timeLeft <= 0 || quizSubmitted) return;
     const timer = setInterval(
@@ -244,6 +254,7 @@ const TakeQuiz: React.FC = () => {
         return ["True", "False"];
 
       case "short-answer":
+      case "drag-drop":
         return null;
 
       default:
@@ -256,7 +267,7 @@ const TakeQuiz: React.FC = () => {
     setAnswers((prev) => ({
       ...prev,
       [questionId]:
-        typeof answer === "object" ? JSON.stringify(answer) : answer,
+        typeof answer === "string" ? answer : JSON.stringify(answer),
     }));
   };
 
@@ -295,7 +306,8 @@ const TakeQuiz: React.FC = () => {
         try {
           if (
             typeof answer === "string" &&
-            question.type === "multiple-selection"
+            (question.type === "multiple-selection" ||
+              question.type === "drag-drop")
           ) {
             processedAnswer = JSON.parse(answer);
           }
@@ -321,6 +333,18 @@ const TakeQuiz: React.FC = () => {
             isCorrect =
               JSON.stringify(processedAnswer?.sort()) ===
               JSON.stringify(correctAnswers.sort());
+            break;
+
+          case "drag-drop":
+            const correctDragAnswers = q.dragDropAnswers || [];
+            const studentDragAnswers = Array.isArray(processedAnswer)
+              ? processedAnswer
+              : typeof processedAnswer === "string"
+              ? JSON.parse(processedAnswer)
+              : [];
+            isCorrect =
+              JSON.stringify(studentDragAnswers) ===
+              JSON.stringify(correctDragAnswers);
             break;
 
           default:
@@ -379,10 +403,10 @@ const TakeQuiz: React.FC = () => {
     let currentAnswer: AnswerType = answers[question.id] || "";
     if (
       typeof currentAnswer === "string" &&
-      question.type === "multiple-selection"
+      (question.type === "multiple-selection" || question.type === "drag-drop")
     ) {
       try {
-        currentAnswer = JSON.parse(currentAnswer);
+        currentAnswer = currentAnswer ? JSON.parse(currentAnswer) : [];
       } catch (e) {
         console.error("Error parsing answer:", e);
         currentAnswer = [];
@@ -423,6 +447,7 @@ const TakeQuiz: React.FC = () => {
             No options available for this question.
           </p>
         );
+
       case "drag-drop":
         return <DragDrop {...commonProps} />;
 
@@ -436,7 +461,8 @@ const TakeQuiz: React.FC = () => {
     try {
       if (
         typeof answer === "string" &&
-        question.type === "multiple-selection"
+        (question.type === "multiple-selection" ||
+          question.type === "drag-drop")
       ) {
         const parsed = JSON.parse(answer);
         return Array.isArray(parsed) ? parsed.join(", ") : answer;
@@ -454,28 +480,20 @@ const TakeQuiz: React.FC = () => {
     );
   };
 
-  if (errorMessage) {
-    return (
-      <ErrorModal
-        message={errorMessage}
-        onClose={() => router.push("/stdinbox")}
-      />
-    );
-  }
-
-  if (!quiz) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  const currentQuestion = quiz.questions[currentQuestionIndex];
-
   const isAnswerEmpty = (answer: AnswerType): boolean => {
     if (!answer) return true;
-    if (typeof answer === "string") return answer.trim() === "";
+    if (typeof answer === "string") {
+      try {
+        const parsedAnswer = JSON.parse(answer);
+        if (Array.isArray(parsedAnswer)) {
+          // Only return false if the user has actually reordered the answers
+          return false;
+        }
+        return answer.trim() === "";
+      } catch {
+        return answer.trim() === "";
+      }
+    }
     if (Array.isArray(answer)) return answer.length === 0;
     return true;
   };
@@ -484,7 +502,7 @@ const TakeQuiz: React.FC = () => {
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <header className="bg-white shadow-md p-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">{quiz.title}</h1>
+          <h1 className="text-2xl font-bold text-gray-800">{quiz?.title}</h1>
           <div className="text-right">
             <p className="text-sm text-gray-600">{studentInfo.name}</p>
             <p className="text-sm text-gray-600">
@@ -502,7 +520,7 @@ const TakeQuiz: React.FC = () => {
         <div className="w-1/4 bg-white shadow-xl rounded-lg p-4 mr-4">
           <h2 className="text-lg font-bold mb-4">Questions</h2>
           <div className="space-y-2">
-            {quiz.questions.map((q, index) => {
+            {quiz?.questions.map((q, index) => {
               const hasAnswer =
                 q.id in answers && !isAnswerEmpty(answers[q.id]);
 
@@ -525,59 +543,63 @@ const TakeQuiz: React.FC = () => {
         </div>
 
         <div className="flex-grow relative">
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={currentQuestionIndex}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3 }}
-              className="bg-white shadow-xl rounded-lg p-8 absolute inset-0"
-            >
-              <h2 className="text-xl font-bold mb-4">
-                Question {currentQuestionIndex + 1} of {quiz.questions.length}
-              </h2>
-              <p className="text-lg mb-6">{currentQuestion.text}</p>
-              {currentQuestion.image_url && (
-                <div className="mb-6">
-                  <Image
-                    src={currentQuestion.image_url}
-                    alt={`Image for question ${currentQuestionIndex + 1}`}
-                    width={400}
-                    height={300}
-                    objectFit="contain"
-                  />
-                </div>
-              )}
-              <div className="question-options">
-                {renderQuestionOptions(currentQuestion)}
-              </div>
-              <div className="flex justify-between mt-6">
-                <button
-                  onClick={() => handleNavigation("prev")}
-                  disabled={currentQuestionIndex === 0}
-                  className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors duration-150 disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                {currentQuestionIndex === quiz.questions.length - 1 ? (
-                  <button
-                    onClick={() => setShowConfirmation(true)}
-                    className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors duration-150"
-                  >
-                    Review Answers
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleNavigation("next")}
-                    className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-150"
-                  >
-                    Next
-                  </button>
+          {quiz && (
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={currentQuestionIndex}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                className="bg-white shadow-xl rounded-lg p-8 absolute inset-0"
+              >
+                <h2 className="text-xl font-bold mb-4">
+                  Question {currentQuestionIndex + 1} of {quiz.questions.length}
+                </h2>
+                <p className="text-lg mb-6">
+                  {quiz.questions[currentQuestionIndex].text}
+                </p>
+                {quiz.questions[currentQuestionIndex].image_url && (
+                  <div className="mb-6">
+                    <Image
+                      src={quiz.questions[currentQuestionIndex].image_url}
+                      alt={`Image for question ${currentQuestionIndex + 1}`}
+                      width={400}
+                      height={300}
+                      objectFit="contain"
+                    />
+                  </div>
                 )}
-              </div>
-            </motion.div>
-          </AnimatePresence>
+                <div className="question-options">
+                  {renderQuestionOptions(quiz.questions[currentQuestionIndex])}
+                </div>
+                <div className="flex justify-between mt-6">
+                  <button
+                    onClick={() => handleNavigation("prev")}
+                    disabled={currentQuestionIndex === 0}
+                    className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors duration-150 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  {currentQuestionIndex === quiz.questions.length - 1 ? (
+                    <button
+                      onClick={() => setShowConfirmation(true)}
+                      className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors duration-150"
+                    >
+                      Review Answers
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleNavigation("next")}
+                      className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-150"
+                    >
+                      Next
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          )}
         </div>
       </main>
 
@@ -608,7 +630,7 @@ const TakeQuiz: React.FC = () => {
                     Review Your Answers
                   </h2>
                   <div className="max-h-[60vh] overflow-y-auto custom-scrollbar space-y-4">
-                    {quiz.questions.map((question, index) => (
+                    {quiz?.questions.map((question, index) => (
                       <div
                         key={question.id}
                         className="p-4 bg-gray-50 rounded-lg"
@@ -637,7 +659,7 @@ const TakeQuiz: React.FC = () => {
                     <button
                       onClick={() => {
                         setShowConfirmation(false);
-                        setHasAnimatedModal(false); // Reset animation state when closing
+                        setHasAnimatedModal(false);
                       }}
                       className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition duration-150"
                     >
@@ -664,6 +686,23 @@ const TakeQuiz: React.FC = () => {
       </AnimatePresence>
     </div>
   );
+
+  if (errorMessage) {
+    return (
+      <ErrorModal
+        message={errorMessage}
+        onClose={() => router.push("/stdinbox")}
+      />
+    );
+  }
+
+  if (!quiz) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   return (
     <ErrorBoundary onError={handleError}>

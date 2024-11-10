@@ -5,8 +5,8 @@ import { X, Camera, Check } from 'lucide-react';
 export interface QuizDetails {
   code: string;
   title: string;
-  releaseDate: string;
-  durationMinutes: number;
+  releaseDate: string | null;
+  durationMinutes: number | null;
 }
 
 export interface QuizDetailsModalProps {
@@ -58,7 +58,10 @@ const QuizDetailsModal: React.FC<QuizDetailsModalProps> = ({ isOpen, onClose, qu
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatAvailability = (dateString: string | null) => {
+    if (!dateString) {
+      return "Always Available";
+    }
     try {
       const date = new Date(dateString);
       return date.toLocaleString('en-US', { 
@@ -70,8 +73,19 @@ const QuizDetailsModal: React.FC<QuizDetailsModalProps> = ({ isOpen, onClose, qu
       });
     } catch (err) {
       console.error('Error formatting date:', err);
-      return dateString;
+      return "Always Available";
     }
+  };
+
+  const formatDuration = (minutes: number | null) => {
+    if (!minutes) return "No time limit";
+    
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    
+    if (hours === 0) return `${remainingMinutes} minutes`;
+    if (remainingMinutes === 0) return `${hours} hour${hours > 1 ? 's' : ''}`;
+    return `${hours} hour${hours > 1 ? 's' : ''} ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''}`;
   };
 
   return (
@@ -113,12 +127,12 @@ const QuizDetailsModal: React.FC<QuizDetailsModalProps> = ({ isOpen, onClose, qu
                   <p className="text-gray-600">{quizDetails.title}</p>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-700 text-lg">Release Date and Time</h3>
-                  <p className="text-gray-600">{formatDate(quizDetails.releaseDate)}</p>
+                  <h3 className="font-semibold text-gray-700 text-lg">Availability</h3>
+                  <p className="text-gray-600">{formatAvailability(quizDetails.releaseDate)}</p>
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-700 text-lg">Duration</h3>
-                  <p className="text-gray-600">{quizDetails.durationMinutes} minutes</p>
+                  <p className="text-gray-600">{formatDuration(quizDetails.durationMinutes)}</p>
                 </div>
               </div>
             </div>

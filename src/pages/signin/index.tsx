@@ -184,7 +184,7 @@ const SignInPage = () => {
                 </button>
               </form>
               <div className="text-center mt-4">
-                <Link href="/reset" className="text-sm text-indigo-500 hover:text-indigo-400 transition duration-200">
+                <Link href="/reset-password" className="text-sm text-indigo-500 hover:text-indigo-400 transition duration-200">
                   Forgot your password?
                 </Link>
               </div>

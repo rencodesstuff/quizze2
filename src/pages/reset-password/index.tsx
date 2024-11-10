@@ -55,17 +55,6 @@ const ResetPassword = () => {
     return validDomains.some(domain => email.toLowerCase().endsWith(domain));
   };
 
-  const generateTemporaryPassword = () => {
-    const length = 12;
-    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
-    let password = "";
-    for (let i = 0; i < length; i++) {
-      const randomIndex = Math.floor(Math.random() * charset.length);
-      password += charset[randomIndex];
-    }
-    return password;
-  };
-
   const checkRateLimit = (): boolean => {
     const now = Date.now();
     if (lastAttemptTime && attempts >= RATE_LIMIT.MAX_ATTEMPTS) {
@@ -106,6 +95,9 @@ const ResetPassword = () => {
         throw new Error('Please use a valid GMI email address');
       }
 
+      // Show sending status
+      toast.loading('Sending reset email...', { id: 'reset-email' });
+
       // Check user existence
       const { data: studentData, error: studentError } = await supabase
         .from('students')
@@ -120,63 +112,96 @@ const ResetPassword = () => {
         .single();
 
       if (!studentData && !teacherData) {
+        toast.dismiss('reset-email');
         throw new Error('No account found with this email address. Please check your email or contact support.');
       }
 
-      // Generate new temporary password
-      const newPassword = generateTemporaryPassword();
-      
-      // Update password in Supabase Auth
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-
-      if (updateError) {
-        console.error('Password Update Error:', updateError);
-        throw new Error('Failed to update password');
-      }
-
-      // Send password reset email
+      // Send password reset email using Supabase's built-in reset functionality
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        email,
+        email.toLowerCase(),
         {
-          redirectTo: `${window.location.origin}/signin`,
+          redirectTo: `${window.location.origin}/reset-password/update#type=recovery`,
         }
       );
 
       if (resetError) {
         console.error('Reset Email Error:', resetError);
-        throw new Error('Failed to send reset email. Please try again later.');
+        toast.dismiss('reset-email');
+        
+        // Handle specific error cases
+        if (resetError.message.includes('For security purposes, you can only request this once every 60 seconds')) {
+          throw new Error('Please wait 60 seconds before requesting another reset email');
+        } else if (resetError.message.includes('Email rate limit exceeded')) {
+          throw new Error('Too many reset attempts. Please try again later.');
+        } else if (resetError.message.includes('Unable to validate email address')) {
+          throw new Error('Invalid email address. Please check and try again.');
+        } else {
+          throw new Error('Failed to send reset email. Please try again later or contact support.');
+        }
       }
+
+      // Log the successful reset attempt
+      await supabase
+        .from('email_logs')
+        .insert({
+          email: email.toLowerCase(),
+          type: 'password_reset',
+          status: 'success'
+        }).select();
 
       // Update rate limiting
       setAttempts(prev => prev + 1);
       setLastAttemptTime(Date.now());
 
+      // Dismiss loading toast and show success
+      toast.dismiss('reset-email');
+
       // Show success message
-      const successMsg = 'A new temporary password has been sent to your email';
+      const successMsg = 'Password reset instructions have been sent to your email. Please check your inbox and spam folder.';
       setSuccessMessage(successMsg);
       toast.success(successMsg, {
-        duration: 5000,
+        duration: 8000,
         action: {
-          label: "Go to Sign In",
-          onClick: () => router.push('/signin')
-        },
+          label: "Didn't receive email?",
+          onClick: () => {
+            setEmail(email); // Keep the email
+            toast.info('Please check your spam folder or try again in 60 seconds', {
+              duration: 5000,
+            });
+          }
+        }
       });
 
       // Clear form
       setEmail('');
 
-      // Redirect after delay
-      setTimeout(() => {
-        router.push('/signin');
-      }, 5000);
-
     } catch (error) {
       console.error('Reset Process Error:', error);
       const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred';
+      
+      // Dismiss loading toast if it exists
+      toast.dismiss('reset-email');
+      
+      // Log the failed attempt
+      await supabase
+        .from('email_logs')
+        .insert({
+          email: email.toLowerCase(),
+          type: 'password_reset',
+          status: 'failed',
+          error: errorMsg
+        }).select();
+
       setErrorMessage(errorMsg);
-      toast.error(errorMsg);
+      toast.error(errorMsg, {
+        duration: 5000,
+        action: {
+          label: "Try Again",
+          onClick: () => {
+            setErrorMessage(null);
+          }
+        }
+      });
     } finally {
       setIsLoading(false);
     }
@@ -290,7 +315,7 @@ const ResetPassword = () => {
                       required
                       className={`w-full pl-10 pr-3 py-2 bg-gray-800 border ${
                         errorMessage ? 'border-red-500' : 'border-gray-700'
-                      } rounded-md shadow-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition duration-200`}
+                      } rounded-md shadow-sm text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition duration-200`}
                       disabled={isDisabled}
                     />
                   </div>
