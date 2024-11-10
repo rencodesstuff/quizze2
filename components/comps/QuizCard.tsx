@@ -72,4 +72,6 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, status }) => {
   );
 };
 
+
+
 export default QuizCard;

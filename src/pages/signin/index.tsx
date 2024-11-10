@@ -1,10 +1,10 @@
-// pages/signin/index.tsx
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router'
 import Link from 'next/link';
 import Head from 'next/head';
 import GradientCanvas from '@/gradient/GradientCanvas';
 import { createClient } from '../../../utils/supabase/component';
+import { AuthError } from '@supabase/supabase-js';
 
 const SignInPage = () => {
   const router = useRouter()
@@ -17,23 +17,19 @@ const SignInPage = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Clear any existing history when reaching the signin page
     if (window.history && window.history.pushState) {
       window.history.pushState(null, '', '/signin');
     }
 
-    // Check if user is already authenticated
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // Fetch user role
         const { data: roleData } = await supabase
           .from('user_roles')
           .select('role')
           .eq('id', session.user.id)
           .single();
 
-        // Redirect to appropriate dashboard
         if (roleData) {
           switch(roleData.role) {
             case 'student':
@@ -61,7 +57,6 @@ const SignInPage = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Prevent back navigation
   useEffect(() => {
     const preventBack = () => {
       window.history.forward();
@@ -74,15 +69,34 @@ const SignInPage = () => {
     };
   }, []);
 
+  const getErrorMessage = (error: AuthError | Error): string => {
+    if (error.message === 'Invalid login credentials') {
+      return 'Invalid email or password. Please check your credentials and try again.';
+    }
+    if (error.message.includes('Email not confirmed')) {
+      return 'Please verify your email address before signing in.';
+    }
+    if (error.message.includes('rate limit')) {
+      return 'Too many login attempts. Please try again later.';
+    }
+    return 'An error occurred during sign in. Please try again.';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
 
     try {
+      // Validate email domain
+      if (!email.toLowerCase().endsWith('@student.gmi.edu.my') && 
+          !email.toLowerCase().endsWith('@gmi.edu.my')) {
+        throw new Error('Please use your GMi email address.');
+      }
+
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password
+        email: email.toLowerCase().trim(),
+        password: password.trim()
       });
       
       if (signInError) throw signInError;
@@ -96,7 +110,6 @@ const SignInPage = () => {
 
         if (roleError) throw roleError;
 
-        // Replace current history entry with destination
         switch(roleData.role) {
           case 'student':
             router.replace('/studentdash');
@@ -113,7 +126,7 @@ const SignInPage = () => {
       }
     } catch (err) {
       console.error('Error during sign in:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred during sign in');
+      setError(getErrorMessage(err as AuthError | Error));
     } finally {
       setIsLoading(false);
     }
@@ -153,7 +166,10 @@ const SignInPage = () => {
                     type="email"
                     id="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setError(null);
+                      setEmail(e.target.value);
+                    }}
                     placeholder='username@student.gmi.edu.my'
                     autoComplete="email"
                     required
@@ -168,7 +184,10 @@ const SignInPage = () => {
                     type="password"
                     id="password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setError(null);
+                      setPassword(e.target.value);
+                    }}
                     placeholder='*******'
                     autoComplete="current-password"
                     required
@@ -177,7 +196,7 @@ const SignInPage = () => {
                 </div>
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || !email || !password}
                   className="w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? 'Signing In...' : 'Sign In'}

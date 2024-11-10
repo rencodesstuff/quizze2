@@ -1,11 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import StudentLayout from "@/comps/student-layout";
-import { QuizCard } from "@/ui/quiz-card";
 import { HoveredLink } from "@/ui/hovered-link";
 import WeeklyCalendar from "@/ui/weekly-calendar";
 import { Tab } from '@headlessui/react';
 import { createClient } from "../../../utils/supabase/server-props";
+import { createClient as createClientBrowser } from "../../../utils/supabase/component";
 import type { GetServerSidePropsContext } from "next";
+import { QuizCard } from "@/ui/quiz-card";
 
 interface Quiz {
   title: string;
@@ -17,15 +18,33 @@ interface Quiz {
   category: string;
 }
 
+interface QuizSubmission {
+  quiz_title: string;
+  submitted_at: string;
+}
+
 interface UpcomingQuiz {
-  name: string;
-  date: string;
+  id: string;
+  title: string;
+  release_date: string | null;
+}
+
+interface DatabaseQuizResult {
+  submitted_at: string;
+  score: number;
+  total_questions: number;
+  quizzes: {
+    title: string;
+  } | null;
 }
 
 interface StudentDashboardProps {
   user: any;
   studentName: string;
   studentId: string;
+  recentQuizzes: QuizSubmission[];
+  upcomingQuizzes: UpcomingQuiz[];
+  studyStreak: number;
 }
 
 const quizzes: Quiz[] = [
@@ -58,18 +77,108 @@ const quizzes: Quiz[] = [
   },
 ];
 
-const upcomingQuizzes: UpcomingQuiz[] = [
-  { name: "JavaScript Advanced", date: "July 15, 2024" },
-  { name: "Python for Data Science", date: "July 20, 2024" },
-  { name: "React Fundamentals", date: "July 25, 2024" },
-];
-
-const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, studentName, studentId }) => {
+const StudentDashboard: React.FC<StudentDashboardProps> = ({ 
+  user, 
+  studentName, 
+  studentId, 
+  recentQuizzes = [],
+  upcomingQuizzes = [],
+  studyStreak: initialStudyStreak = 0
+}) => {
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [studyStreak, setStudyStreak] = useState(initialStudyStreak);
+
+  useEffect(() => {
+    const updateLoginStreak = async () => {
+      const supabase = createClientBrowser();
+      
+      try {
+        // Get current user's last login
+        const { data: streakData, error: streakError } = await supabase
+          .from('login_streaks')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (streakError && streakError.code === 'PGRST116') {
+          // No streak record exists, create first one
+          const { data: newStreak } = await supabase
+            .from('login_streaks')
+            .insert([{
+              user_id: user.id,
+              last_login_date: today.toISOString(),
+              current_streak: 1
+            }])
+            .select()
+            .single();
+            
+          if (newStreak) {
+            setStudyStreak(1);
+          }
+          return;
+        }
+
+        if (streakData) {
+          const lastLogin = new Date(streakData.last_login_date);
+          lastLogin.setHours(0, 0, 0, 0);
+
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+
+          // Only update if the last login was not today
+          if (lastLogin.getTime() !== today.getTime()) {
+            let newStreak;
+            if (lastLogin.getTime() === yesterday.getTime()) {
+              // If last login was yesterday, increment streak
+              newStreak = streakData.current_streak + 1;
+            } else {
+              // If last login was before yesterday, reset streak to 0
+              newStreak = 0;
+            }
+
+            const { data: updatedStreak } = await supabase
+              .from('login_streaks')
+              .update({
+                last_login_date: today.toISOString(),
+                current_streak: newStreak
+              })
+              .eq('user_id', user.id)
+              .select()
+              .single();
+              
+            if (updatedStreak) {
+              setStudyStreak(newStreak);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error updating login streak:', error);
+      }
+    };
+
+    if (user?.id) {
+      updateLoginStreak();
+    }
+  }, [user?.id]);
+
+  const categories = ["All", ...new Set(quizzes.map(quiz => quiz.category))];
 
   const filteredQuizzes = selectedCategory === "All" 
     ? quizzes 
     : quizzes.filter(quiz => quiz.category === selectedCategory);
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric'
+    });
+  };
 
   return (
     <StudentLayout studentName={studentName} studentId={studentId}>
@@ -91,7 +200,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, studentName, 
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4">Quiz Categories</h2>
           <div className="flex flex-wrap gap-4">
-            {["All", "Web Development", "Computer Science", "Data Science", "Artificial Intelligence"].map(category => (
+            {categories.map(category => (
               <HoveredLink 
                 key={category} 
                 href="#" 
@@ -108,13 +217,21 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, studentName, 
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4">Available Quizzes</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredQuizzes.map((quiz, index) => (
-              <QuizCard key={index} quiz={quiz} />
+            {filteredQuizzes.map((quiz) => (
+              <QuizCard 
+                key={quiz.title} 
+                quiz={quiz}
+              />
             ))}
+            {filteredQuizzes.length === 0 && (
+              <div className="col-span-full text-center text-gray-500 py-8">
+                No quizzes available in this category yet
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Upcoming Quizzes and Recent Results */}
+        {/* Recent Quizzes and Upcoming Quizzes */}
         <div className="mb-8">
           <Tab.Group>
             <Tab.List className="flex space-x-4 border-b">
@@ -130,37 +247,40 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, studentName, 
                   selected ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'
                 }`
               }>
-                Recent Results
+                Recent Quizzes
               </Tab>
             </Tab.List>
             <Tab.Panels className="mt-4">
               <Tab.Panel>
                 <ul className="space-y-2">
-                  {upcomingQuizzes.map((quiz, index) => (
-                    <li key={index} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
-                      <span>{quiz.name}</span>
-                      <span className="text-gray-600">{quiz.date}</span>
+                  {(upcomingQuizzes || []).map((quiz) => (
+                    <li key={quiz.id} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+                      <span>{quiz.title}</span>
+                      <span className="text-gray-600">
+                        {quiz.release_date ? formatDate(quiz.release_date) : 'Date not set'}
+                      </span>
                     </li>
                   ))}
+                  {(!upcomingQuizzes || upcomingQuizzes.length === 0) && (
+                    <li className="text-gray-500 text-center py-4">
+                      No upcoming quizzes at the moment
+                    </li>
+                  )}
                 </ul>
               </Tab.Panel>
               <Tab.Panel>
                 <ul className="space-y-2">
-                  {[
-                    { name: "JavaScript Basics", date: "June 28, 2024", score: 85 },
-                    { name: "Python Fundamentals", date: "June 25, 2024", score: 92 },
-                    { name: "HTML and CSS", date: "June 20, 2024", score: 78 },
-                  ].map((result, index) => (
+                  {(recentQuizzes || []).map((result, index) => (
                     <li key={index} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
-                      <span>{result.name}</span>
-                      <span>{result.date}</span>
-                      <span className={`font-semibold ${
-                        result.score >= 90 ? 'text-green-600' : 
-                        result.score >= 80 ? 'text-blue-600' : 
-                        result.score >= 70 ? 'text-yellow-600' : 'text-red-600'
-                      }`}>{result.score}%</span>
+                      <span>{result.quiz_title}</span>
+                      <span className="text-gray-600">{formatDate(result.submitted_at)}</span>
                     </li>
                   ))}
+                  {(!recentQuizzes || recentQuizzes.length === 0) && (
+                    <li className="text-gray-500 text-center py-4">
+                      No recent quizzes
+                    </li>
+                  )}
                 </ul>
               </Tab.Panel>
             </Tab.Panels>
@@ -171,7 +291,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, studentName, 
         <div className="bg-white p-4 rounded-lg shadow">
           <h2 className="text-xl font-semibold mb-4">Your Study Streak</h2>
           <div className="flex items-center">
-            <div className="text-3xl font-bold text-blue-600 mr-4">7</div>
+            <div className="text-3xl font-bold text-blue-600 mr-4">{studyStreak}</div>
             <div>
               <p className="font-semibold">Days in a row</p>
               <p className="text-gray-600">Keep it up!</p>
@@ -197,23 +317,67 @@ export async function getServerSideProps(context: GetServerSidePropsContext) {
     };
   }
 
-  // Fetch user details from the students table
+  // Fetch student details
   const { data: studentData, error: studentError } = await supabase
     .from('students')
     .select('name, student_id')
     .eq('id', user.id)
     .single();
 
-  // Log any errors
   if (studentError) {
     console.error('Error fetching student data:', studentError);
   }
 
+  // Fetch upcoming quizzes
+  const { data: upcomingQuizzes = [], error: upcomingError } = await supabase
+    .from('quizzes')
+    .select(`
+      id,
+      title,
+      release_date
+    `)
+    .gt('release_date', new Date().toISOString())
+    .order('release_date', { ascending: true })
+    .limit(5);
+
+  // Fetch recent quiz submissions
+  const { data: rawResults = [], error: resultsError } = await supabase
+    .from('quiz_submissions')
+    .select(`
+      submitted_at,
+      quizzes!inner (
+        title
+      )
+    `)
+    .eq('student_id', user.id)
+    .order('submitted_at', { ascending: false })
+    .limit(5);
+
+  // Transform quiz submissions data with proper typing
+  const formattedResults: QuizSubmission[] = (rawResults || []).map((result: any) => ({
+    quiz_title: result.quizzes?.title || 'Unknown Quiz',
+    submitted_at: result.submitted_at
+  }));
+
+  // Fetch current login streak
+  const { data: streakData = { current_streak: 0 }, error: streakError } = await supabase
+    .from('login_streaks')
+    .select('current_streak')
+    .eq('user_id', user.id)
+    .single();
+
+  if (streakError && streakError.code !== 'PGRST116') {
+    console.error('Error fetching streak data:', streakError);
+  }
+
   return {
     props: {
-      user: user,
+      user,
       studentName: studentData?.name || 'Student',
       studentId: studentData?.student_id || '',
+      recentQuizzes: formattedResults,
+      upcomingQuizzes: upcomingQuizzes || [],
+      studyStreak: streakData?.current_streak || 0
     },
   };
 }
