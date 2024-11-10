@@ -1,4 +1,3 @@
-// AddQuestions.tsx
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import TeacherLayout from "@/comps/teacher-layout";
@@ -17,7 +16,12 @@ import {
 interface DatabaseQuestion {
   id?: string;
   quiz_id: string;
-  type: 'multiple-choice' | 'true-false' | 'short-answer' | 'multiple-selection' | 'drag-drop';
+  type:
+    | "multiple-choice"
+    | "true-false"
+    | "short-answer"
+    | "multiple-selection"
+    | "drag-drop";
   text: string;
   options: any | null;
   correct_answer: string;
@@ -32,7 +36,7 @@ interface Question {
   id?: string;
   type: string;
   text: string;
-  options?: string[] | null; 
+  options?: string[] | null;
   correct_answer: string;
   image_url?: string;
   explanation: string;
@@ -63,11 +67,16 @@ const AddQuestions: React.FC = () => {
 
   const supabase = createClient();
 
+  // Fetch initial data on component mount
   useEffect(() => {
-    if (quizId) {
-      fetchQuizTitle();
-      fetchQuestions();
-    }
+    const initializeQuiz = async () => {
+      if (quizId) {
+        await fetchQuizTitle();
+        await fetchQuestions();
+      }
+    };
+
+    initializeQuiz();
   }, [quizId]);
 
   const fetchQuizTitle = async () => {
@@ -91,12 +100,12 @@ const AddQuestions: React.FC = () => {
       .select("*")
       .eq("quiz_id", quizId)
       .order("created_at", { ascending: true });
-  
+
     if (error) {
       console.error("Error fetching questions:", error);
     } else if (data) {
       const parsedQuestions = data.map((q) => {
-        if (q.type === 'drag-drop') {
+        if (q.type === "drag-drop") {
           return {
             ...q,
             drag_drop_text: q.drag_drop_text || [],
@@ -113,7 +122,6 @@ const AddQuestions: React.FC = () => {
     }
     setIsLoading(false);
   };
-
   const handleQuestionTypeChange = (type: string) => {
     let newQuestion: Question = {
       ...currentQuestion,
@@ -181,6 +189,7 @@ const AddQuestions: React.FC = () => {
     newOptions[index] = value;
     setCurrentQuestion({ ...currentQuestion, options: newOptions });
   };
+
   const addOption = () => {
     setCurrentQuestion({
       ...currentQuestion,
@@ -207,21 +216,132 @@ const AddQuestions: React.FC = () => {
       alert("Unable to preview quiz. Please try again.");
     }
   };
+  const addQuestion = async () => {
+    setIsSubmitting(true);
+    try {
+      if (!quizId || typeof quizId !== "string") {
+        throw new Error("Quiz ID is not available or invalid");
+      }
 
+      let image_url = null;
+      if (imageFile) {
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("question-images")
+          .upload(`${quizId}/${Date.now()}-${imageFile.name}`, imageFile);
+
+        if (uploadError) throw uploadError;
+
+        if (uploadData) {
+          const {
+            data: { publicUrl },
+          } = supabase.storage
+            .from("question-images")
+            .getPublicUrl(uploadData.path);
+
+          image_url = publicUrl;
+        }
+      }
+
+      // Prepare question data based on type
+      let questionData: DatabaseQuestion = {
+        quiz_id: quizId,
+        type: currentQuestion.type as DatabaseQuestion["type"],
+        text: currentQuestion.text,
+        image_url,
+        explanation: currentQuestion.explanation || null,
+        options: null,
+        correct_answer: currentQuestion.correct_answer,
+        multiple_correct_answers: null,
+        drag_drop_text: null,
+        drag_drop_answers: null,
+      };
+
+      // Add type-specific data
+      if (currentQuestion.type === "drag-drop") {
+        questionData = {
+          ...questionData,
+          drag_drop_text: currentQuestion.drag_drop_text || [],
+          drag_drop_answers: currentQuestion.drag_drop_answers || [],
+          correct_answer: JSON.stringify(
+            currentQuestion.drag_drop_answers || []
+          ),
+        };
+      } else if (currentQuestion.type === "multiple-selection") {
+        questionData = {
+          ...questionData,
+          options: currentQuestion.options
+            ? JSON.stringify(currentQuestion.options)
+            : null,
+          multiple_correct_answers:
+            currentQuestion.multiple_correct_answers || [],
+          correct_answer: JSON.stringify(
+            currentQuestion.multiple_correct_answers || []
+          ),
+        };
+      } else {
+        questionData = {
+          ...questionData,
+          options: currentQuestion.options
+            ? JSON.stringify(currentQuestion.options)
+            : null,
+          correct_answer: currentQuestion.correct_answer,
+        };
+      }
+
+      const { data, error } = await supabase
+        .from("questions")
+        .insert([questionData])
+        .select();
+
+      if (error) throw error;
+
+      if (data) {
+        let newQuestion;
+        if (data[0].type === "drag-drop") {
+          newQuestion = {
+            ...data[0],
+            dragDropText: data[0].drag_drop_text,
+            dragDropAnswers: data[0].drag_drop_answers,
+          };
+        } else {
+          newQuestion = {
+            ...data[0],
+            options: data[0].options ? JSON.parse(data[0].options) : undefined,
+          };
+        }
+
+        setQuestions([...questions, newQuestion]);
+        setCurrentQuestion({
+          type: "multiple-choice",
+          text: "",
+          options: ["", ""],
+          correct_answer: "",
+          explanation: "",
+          multiple_correct_answers: [],
+        });
+        setImageFile(null);
+      }
+    } catch (error) {
+      console.error("Error adding question:", error);
+      alert("Failed to add question. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   const renderDragDropInputs = () => {
     const [dragDropAnswers, setDragDropAnswers] = useState<string[]>([]);
-    const [answerInput, setAnswerInput] = useState('');
+    const [answerInput, setAnswerInput] = useState("");
 
     const handleAddAnswer = () => {
       if (answerInput.trim()) {
         const newAnswers = [...dragDropAnswers, answerInput.trim()];
         setDragDropAnswers(newAnswers);
-        setAnswerInput('');
+        setAnswerInput("");
 
-        setCurrentQuestion(prev => ({
+        setCurrentQuestion((prev) => ({
           ...prev,
           drag_drop_answers: newAnswers,
-          correct_answer: JSON.stringify(newAnswers)
+          correct_answer: JSON.stringify(newAnswers),
         }));
       }
     };
@@ -229,23 +349,23 @@ const AddQuestions: React.FC = () => {
     const handleRemoveAnswer = (index: number) => {
       const newAnswers = dragDropAnswers.filter((_, i) => i !== index);
       setDragDropAnswers(newAnswers);
-      
-      setCurrentQuestion(prev => ({
+
+      setCurrentQuestion((prev) => ({
         ...prev,
         drag_drop_answers: newAnswers,
-        correct_answer: JSON.stringify(newAnswers)
+        correct_answer: JSON.stringify(newAnswers),
       }));
     };
 
     const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const text = e.target.value;
-      const segments = text.split('[blank]');
-      
+      const segments = text.split("[blank]");
+
       setCurrentQuestion((prev: Question) => ({
         ...prev,
         text: text,
         drag_drop_text: segments,
-        options: undefined, // Change null to undefined
+        options: undefined,
       }));
     };
 
@@ -265,8 +385,11 @@ const AddQuestions: React.FC = () => {
                   const start = textarea.selectionStart;
                   const end = textarea.selectionEnd;
                   const text = textarea.value;
-                  const newText = text.slice(0, start) + '[blank]' + text.slice(end);
-                  handleTextChange({ target: { value: newText } } as React.ChangeEvent<HTMLTextAreaElement>);
+                  const newText =
+                    text.slice(0, start) + "[blank]" + text.slice(end);
+                  handleTextChange({
+                    target: { value: newText },
+                  } as React.ChangeEvent<HTMLTextAreaElement>);
                 }}
                 className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
               >
@@ -300,7 +423,7 @@ const AddQuestions: React.FC = () => {
                 className="flex-1 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Type an answer"
                 onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === "Enter") {
                     e.preventDefault();
                     handleAddAnswer();
                   }
@@ -337,24 +460,6 @@ const AddQuestions: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {currentQuestion.drag_drop_text && currentQuestion.drag_drop_text.length > 1 && (
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Preview:</h3>
-            <div className="text-gray-600">
-              {currentQuestion.drag_drop_text.map((segment, index) => (
-                <React.Fragment key={index}>
-                  {segment}
-                  {index < currentQuestion.drag_drop_text!.length - 1 && (
-                    <span className="inline-block px-3 py-1 mx-1 bg-blue-100 text-blue-800 rounded">
-                      {dragDropAnswers[index] || `Blank ${index + 1}`}
-                    </span>
-                  )}
-                </React.Fragment>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     );
   };
@@ -406,10 +511,15 @@ const AddQuestions: React.FC = () => {
           <div key={index} className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={currentQuestion.multiple_correct_answers?.includes(option)}
+              checked={currentQuestion.multiple_correct_answers?.includes(
+                option
+              )}
               onChange={(e) => {
                 const newAnswers = e.target.checked
-                  ? [...(currentQuestion.multiple_correct_answers || []), option]
+                  ? [
+                      ...(currentQuestion.multiple_correct_answers || []),
+                      option,
+                    ]
                   : (currentQuestion.multiple_correct_answers || []).filter(
                       (a) => a !== option
                     );
@@ -450,110 +560,6 @@ const AddQuestions: React.FC = () => {
     </div>
   );
 
-const addQuestion = async () => {
-  setIsSubmitting(true);
-  try {
-    if (!quizId || typeof quizId !== 'string') {
-      throw new Error("Quiz ID is not available or invalid");
-    }
-  
-      let image_url = null;
-      if (imageFile) {
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("question-images")
-          .upload(`${quizId}/${Date.now()}-${imageFile.name}`, imageFile);
-  
-        if (uploadError) throw uploadError;
-  
-        if (uploadData) {
-          const {
-            data: { publicUrl },
-          } = supabase.storage
-            .from("question-images")
-            .getPublicUrl(uploadData.path);
-  
-          image_url = publicUrl;
-        }
-      }
-
-      // Prepare question data based on type
-      let questionData: DatabaseQuestion = {
-        quiz_id: quizId,
-        type: currentQuestion.type as DatabaseQuestion['type'],
-        text: currentQuestion.text,
-        image_url,
-        explanation: currentQuestion.explanation || null,
-        options: null,
-        correct_answer: currentQuestion.correct_answer,
-        multiple_correct_answers: null,
-        drag_drop_text: null,
-        drag_drop_answers: null
-      };
-  
-      // Add type-specific data
-      if (currentQuestion.type === 'drag-drop') {
-        questionData = {
-          ...questionData,
-          drag_drop_text: currentQuestion.drag_drop_text || [],
-          drag_drop_answers: currentQuestion.drag_drop_answers || [],
-          correct_answer: JSON.stringify(currentQuestion.drag_drop_answers || []),
-        };
-      } else if (currentQuestion.type === 'multiple-selection') {
-        questionData = {
-          ...questionData,
-          options: currentQuestion.options ? JSON.stringify(currentQuestion.options) : null,
-          multiple_correct_answers: currentQuestion.multiple_correct_answers || [],
-          correct_answer: JSON.stringify(currentQuestion.multiple_correct_answers || []),
-        };
-      } else {
-        questionData = {
-          ...questionData,
-          options: currentQuestion.options ? JSON.stringify(currentQuestion.options) : null,
-          correct_answer: currentQuestion.correct_answer,
-        };
-      }
-  
-      const { data, error } = await supabase
-        .from("questions")
-        .insert([questionData])
-        .select();
-  
-      if (error) throw error;
-  
-      if (data) {
-        let newQuestion;
-        if (data[0].type === 'drag-drop') {
-          newQuestion = {
-            ...data[0],
-            dragDropText: data[0].drag_drop_text,
-            dragDropAnswers: data[0].drag_drop_answers,
-          };
-        } else {
-          newQuestion = {
-            ...data[0],
-            options: data[0].options ? JSON.parse(data[0].options) : undefined,
-          };
-        }
-        
-        setQuestions([...questions, newQuestion]);
-        setCurrentQuestion({
-          type: "multiple-choice",
-          text: "",
-          options: ["", ""],
-          correct_answer: "",
-          explanation: "",
-          multiple_correct_answers: [],
-        });
-        setImageFile(null);
-      }
-    } catch (error) {
-      console.error("Error adding question:", error);
-      alert("Failed to add question. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const renderQuestionList = () => {
     return (
       <motion.div
@@ -579,7 +585,7 @@ const addQuestion = async () => {
                 {q.type === "drag-drop" ? "Drag and Drop Question" : q.text}
               </h3>
               <p className="text-sm text-gray-600 mt-1">Type: {q.type}</p>
-  
+
               {q.type === "drag-drop" && (
                 <div className="mt-2">
                   <p className="text-sm font-medium text-gray-700">
@@ -602,7 +608,7 @@ const addQuestion = async () => {
                   </p>
                 </div>
               )}
-  
+
               {q.image_url && (
                 <div className="mt-2">
                   <Image
@@ -614,7 +620,7 @@ const addQuestion = async () => {
                   />
                 </div>
               )}
-  
+
               {q.type === "multiple-choice" && q.options && (
                 <div className="mt-2">
                   <p className="text-sm font-medium text-gray-700">Options:</p>
@@ -625,7 +631,7 @@ const addQuestion = async () => {
                   </ul>
                 </div>
               )}
-  
+
               {q.type === "multiple-selection" && q.options && (
                 <div className="mt-2">
                   <p className="text-sm font-medium text-gray-700">Options:</p>
@@ -641,13 +647,13 @@ const addQuestion = async () => {
                   </ul>
                 </div>
               )}
-  
+
               {q.type !== "drag-drop" && (
                 <p className="mt-2 text-sm font-medium text-green-600">
                   Correct Answer: {q.correct_answer}
                 </p>
               )}
-  
+
               <p className="mt-1 text-sm text-gray-600">
                 Explanation: {q.explanation}
               </p>
@@ -657,7 +663,6 @@ const addQuestion = async () => {
       </motion.div>
     );
   };
-  
   const renderQuestionForm = () => {
     return (
       <motion.div
@@ -671,7 +676,26 @@ const addQuestion = async () => {
         </h2>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {renderQuestionTypeSelect()}
+            <div>
+              <label
+                htmlFor="questionType"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Question Type
+              </label>
+              <select
+                id="questionType"
+                value={currentQuestion.type}
+                onChange={(e) => handleQuestionTypeChange(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="multiple-choice">Multiple Choice</option>
+                <option value="true-false">True/False</option>
+                <option value="short-answer">Short Answer</option>
+                <option value="multiple-selection">Multiple Selection</option>
+                <option value="drag-drop">Drag and Drop</option>
+              </select>
+            </div>
 
             {currentQuestion.type !== "drag-drop" && (
               <div>
@@ -755,6 +779,7 @@ const addQuestion = async () => {
             </div>
           )}
 
+          {/* Image Upload */}
           <div>
             <label
               htmlFor="questionImage"
@@ -791,8 +816,10 @@ const addQuestion = async () => {
             </div>
           </div>
 
-          {currentQuestion.type === "multiple-choice" && renderMultipleChoiceInputs()}
-          {currentQuestion.type === "multiple-selection" && renderMultipleSelectionInputs()}
+          {currentQuestion.type === "multiple-choice" &&
+            renderMultipleChoiceInputs()}
+          {currentQuestion.type === "multiple-selection" &&
+            renderMultipleSelectionInputs()}
 
           <div>
             <label
@@ -854,29 +881,6 @@ const addQuestion = async () => {
     );
   };
 
-  const renderQuestionTypeSelect = () => (
-    <div>
-      <label
-        htmlFor="questionType"
-        className="block text-sm font-medium text-gray-700 mb-1"
-      >
-        Question Type
-      </label>
-      <select
-        id="questionType"
-        value={currentQuestion.type}
-        onChange={(e) => handleQuestionTypeChange(e.target.value)}
-        className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-      >
-        <option value="multiple-choice">Multiple Choice</option>
-        <option value="true-false">True/False</option>
-        <option value="short-answer">Short Answer</option>
-        <option value="multiple-selection">Multiple Selection</option>
-        <option value="drag-drop">Drag and Drop</option>
-      </select>
-    </div>
-  );
-
   if (isLoading) {
     return (
       <TeacherLayout>
@@ -894,7 +898,7 @@ const addQuestion = async () => {
           Add Questions to {quizTitle}
         </h1>
         {renderQuestionForm()}
-        {renderQuestionList()}
+        {questions.length > 0 && renderQuestionList()}
         <div className="mt-8 flex justify-end space-x-4">
           <button
             onClick={() => router.push("/teachquiz")}
