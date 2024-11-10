@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import TeacherLayout from "@/comps/teacher-layout";
 import { createClient } from "../../../../utils/supabase/component";
@@ -37,13 +37,7 @@ const EditQuiz = () => {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
-  useEffect(() => {
-    if (id) {
-      fetchQuiz();
-    }
-  }, [id]);
-
-  const fetchQuiz = async () => {
+  const fetchQuiz = useCallback(async () => {
     try {
       setLoading(true);
       const { data: quizData, error: quizError } = await supabase
@@ -67,7 +61,13 @@ const EditQuiz = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, supabase]);
+
+  useEffect(() => {
+    if (id) {
+      fetchQuiz();
+    }
+  }, [id, fetchQuiz]);
 
   const handleQuizChange = (field: string, value: any) => {
     if (quiz) {
