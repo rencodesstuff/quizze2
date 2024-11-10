@@ -49,68 +49,6 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
     setError(null);
   }, []);
 
-  const handleSecurityViolation = useCallback(async (violationType: string) => {
-    if (!strictMode) return;
-    
-    try {
-      const newViolationCount = violationCount + 1;
-      setViolationCount(newViolationCount);
-
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError) {
-        throw {
-          title: 'Authentication Error',
-          message: 'Unable to verify user identity. Please refresh the page and try again.',
-          type: 'error'
-        };
-      }
-
-      if (!user) {
-        throw {
-          title: 'Session Error',
-          message: 'No active session found. Please log in again.',
-          type: 'error'
-        };
-      }
-
-      const { error: violationError } = await supabase.from('quiz_security_violations').insert({
-        quiz_id: quizId,
-        student_id: user.id,
-        violation_type: violationType,
-        student_name: studentName,
-        quiz_title: quizTitle
-      });
-
-      if (violationError) {
-        throw {
-          title: 'Security Warning',
-          message: 'Failed to record security violation. This incident will be reported.',
-          type: 'warning'
-        };
-      }
-
-      const channel = supabase.channel('security-violations');
-      await channel.send({
-        type: 'broadcast',
-        event: 'security_violation',
-        payload: {
-          quiz_id: quizId,
-          student_name: studentName,
-          violation_type: violationType,
-          teacher_id: teacherId,
-          violation_count: newViolationCount
-        }
-      });
-
-      if (newViolationCount >= 3) {
-        await handleForcedSubmission();
-      }
-    } catch (error) {
-      handleError(error as SecurityError);
-    }
-  }, [quizId, teacherId, studentName, quizTitle, strictMode, violationCount, supabase, handleError]);
-
   const handleForcedSubmission = useCallback(async () => {
     if (isSubmitting) return;
     
@@ -173,6 +111,68 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
       handleError(error as SecurityError);
     }
   }, [isSubmitting, quizId, studentName, quizTitle, supabase, router, handleError]);
+
+  const handleSecurityViolation = useCallback(async (violationType: string) => {
+    if (!strictMode) return;
+    
+    try {
+      const newViolationCount = violationCount + 1;
+      setViolationCount(newViolationCount);
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        throw {
+          title: 'Authentication Error',
+          message: 'Unable to verify user identity. Please refresh the page and try again.',
+          type: 'error'
+        };
+      }
+
+      if (!user) {
+        throw {
+          title: 'Session Error',
+          message: 'No active session found. Please log in again.',
+          type: 'error'
+        };
+      }
+
+      const { error: violationError } = await supabase.from('quiz_security_violations').insert({
+        quiz_id: quizId,
+        student_id: user.id,
+        violation_type: violationType,
+        student_name: studentName,
+        quiz_title: quizTitle
+      });
+
+      if (violationError) {
+        throw {
+          title: 'Security Warning',
+          message: 'Failed to record security violation. This incident will be reported.',
+          type: 'warning'
+        };
+      }
+
+      const channel = supabase.channel('security-violations');
+      await channel.send({
+        type: 'broadcast',
+        event: 'security_violation',
+        payload: {
+          quiz_id: quizId,
+          student_name: studentName,
+          violation_type: violationType,
+          teacher_id: teacherId,
+          violation_count: newViolationCount
+        }
+      });
+
+      if (newViolationCount >= 3) {
+        await handleForcedSubmission();
+      }
+    } catch (error) {
+      handleError(error as SecurityError);
+    }
+  }, [quizId, teacherId, studentName, quizTitle, strictMode, violationCount, supabase, handleError, handleForcedSubmission]);
 
   useEffect(() => {
     if (!strictMode) return;
@@ -256,7 +256,6 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
         {children}
       </div>
       
-      {/* Security Warning Modal */}
       {(showWarning || needsUserAction) && (
         <Modal
           isOpen={true}
@@ -269,7 +268,6 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
         />
       )}
 
-      {/* Error Modal */}
       {error && (
         <ErrorModal
           message={error.message}

@@ -1,5 +1,12 @@
 // pages/stdquiz/[id].tsx
-import React, { useState, useEffect, ErrorInfo, ReactNode, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  ErrorInfo,
+  ReactNode,
+  useCallback,
+  useMemo,
+} from "react";
 import { useRouter } from "next/router";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -15,7 +22,7 @@ import {
 import Modal from "@/comps/Modal";
 import ExamSecurityWrapper from "@/comps/ExamSecurity";
 
-// Type definitions for quiz components
+// Type definitions remain the same...
 type AnswerType = string | string[];
 
 interface Answers {
@@ -61,10 +68,8 @@ interface ModalProps {
   title: string;
   message: string;
   isError?: boolean;
-  children?: React.ReactNode; // Added this line to accept children
+  children?: React.ReactNode; // this line to accept children
 }
-
-
 // Helper function to safely parse JSON strings
 const safeJSONParse = (str: string | null) => {
   if (!str) return null;
@@ -77,6 +82,7 @@ const safeJSONParse = (str: string | null) => {
   }
 };
 
+// ErrorBoundary component remains the same...
 // Error boundary component
 class ErrorBoundary extends React.Component<
   {
@@ -132,6 +138,7 @@ const TakeQuiz: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
+  // State declarations remain the same...
   // Modal states
   const [modalState, setModalState] = useState<ModalState>({
     isOpen: false,
@@ -165,7 +172,7 @@ const TakeQuiz: React.FC = () => {
   }, []);
 
   const closeModal = useCallback(() => {
-    setModalState(prev => ({ ...prev, isOpen: false }));
+    setModalState((prev) => ({ ...prev, isOpen: false }));
   }, []);
 
   // Hash function for randomization
@@ -203,14 +210,298 @@ const TakeQuiz: React.FC = () => {
   }, []);
 
   // Handle error from error boundary
-  const handleError = useCallback((error: Error, errorInfo: ErrorInfo) => {
-    showError(
-      "System Error",
-      "An unexpected error occurred. Please try refreshing the page."
-    );
-    console.error("Error caught by boundary:", error, errorInfo);
-  }, [showError]);
+  const handleError = useCallback(
+    (error: Error, errorInfo: ErrorInfo) => {
+      showError(
+        "System Error",
+        "An unexpected error occurred. Please try refreshing the page."
+      );
+      console.error("Error caught by boundary:", error, errorInfo);
+    },
+    [showError]
+  );
 
+  const validateQuestionOptions = useCallback(
+    (question: BaseQuestion): string[] | null => {
+      let parsedOptions = question.options;
+
+      if (typeof question.options === "string") {
+        parsedOptions = safeJSONParse(question.options);
+      }
+
+      switch (question.type) {
+        case "multiple-choice":
+        case "multiple-selection":
+          if (
+            Array.isArray(parsedOptions) &&
+            parsedOptions.every((opt) => typeof opt === "string")
+          ) {
+            return parsedOptions.map((opt) => opt.trim());
+          }
+          return null;
+
+        case "true-false":
+          return ["True", "False"];
+
+        case "short-answer":
+        case "drag-drop":
+          return null;
+
+        default:
+          console.warn(`Unexpected question type: ${question.type}`);
+          return null;
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+  const fetchQuizAndStudentInfo = async () => {
+    if (typeof id !== "string") {
+      showError("Invalid Quiz", "Invalid quiz ID. Please try again.");
+      return;
+    }
+
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) throw new Error("Authentication error");
+      if (!user) throw new Error("No authenticated user found");
+
+      const [studentData, quizData] = await Promise.all([
+        supabase
+          .from("students")
+          .select("name, student_id")
+          .eq("id", user.id)
+          .single(),
+        supabase
+          .from("quizzes")
+          .select(
+            `
+            id, title, duration_minutes, release_date, 
+            randomize_arrangement, strict_mode, teacher_id,
+            questions (id, type, text, options, correct_answer, image_url,
+                    explanation, multiple_correct_answers, drag_drop_text, drag_drop_answers)
+          `
+          )
+          .eq("id", id)
+          .single(),
+      ]);
+
+      if (studentData.error) throw new Error("Error fetching student data");
+      if (quizData.error) throw new Error("Error fetching quiz data");
+
+      setStudentInfo({
+        name: studentData.data.name,
+        id: studentData.data.student_id,
+      });
+
+      const seed = hashCode(
+        `${studentData.data.student_id}-${quizData.data.id}`
+      );
+      setRandomSeed(seed);
+
+      let validatedQuestions = quizData.data.questions.map((q: BaseQuestion) => ({
+        ...q,
+        options: validateQuestionOptions(q),
+        dragDropAnswers:
+          q.type === "drag-drop" ? q.drag_drop_answers || [] : undefined,
+        dragDropText: q.type === "drag-drop" ? q.drag_drop_text || [] : undefined,
+      }));
+
+      if (quizData.data.randomize_arrangement) {
+        validatedQuestions = shuffleArray(validatedQuestions, seed);
+      }
+
+      setQuiz({
+        ...quizData.data,
+        questions: validatedQuestions,
+      });
+      setTimeLeft(quizData.data.duration_minutes * 60);
+
+      const initialAnswers: Answers = {};
+      setAnswers(initialAnswers);
+    } catch (error) {
+      showError(
+        "Loading Error",
+        `An error occurred while loading the quiz: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchQuizAndStudentInfo();
+}, [id, supabase, hashCode, shuffleArray, showError, validateQuestionOptions]);  // Added validateQuestionOptions
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0 || quizSubmitted) return;
+
+    const timer = setInterval(
+      () =>
+        setTimeLeft((prev) => {
+          if (prev !== null && prev > 0) {
+            const newTime = prev - 1;
+            if (newTime === 300) {
+              // 5 minutes warning
+              showError(
+                "Time Warning",
+                "You have 5 minutes remaining to complete the quiz."
+              );
+            }
+            return newTime;
+          }
+          return 0;
+        }),
+      1000
+    );
+
+    return () => clearInterval(timer);
+  }, [timeLeft, quizSubmitted, showError]);
+
+
+
+  const handleAnswer = useCallback((questionId: string, answer: AnswerType) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]:
+        typeof answer === "string" ? answer : JSON.stringify(answer),
+    }));
+  }, []);
+
+  const handleNavigation = useCallback(
+    (direction: "next" | "prev") => {
+      if (!quiz) return;
+      const newIndex =
+        direction === "next"
+          ? currentQuestionIndex + 1
+          : currentQuestionIndex - 1;
+      if (newIndex >= 0 && newIndex < quiz.questions.length) {
+        setCurrentQuestionIndex(newIndex);
+      }
+    },
+    [quiz, currentQuestionIndex]
+  );
+
+  const handleSubmitQuiz = async () => {
+    if (!quiz || typeof id !== "string") {
+      showError("Submission Error", "Unable to submit quiz. Please try again.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+      if (userError) throw new Error("Authentication error during submission");
+      if (!user) throw new Error("No authenticated user found");
+
+      const processedAnswers = Object.entries(answers).reduce<
+        Record<string, any>
+      >((acc, [qId, answer]) => {
+        const question = quiz.questions.find((q) => q.id === qId);
+        if (!question) return acc;
+
+        let processedAnswer = answer;
+        try {
+          if (
+            typeof answer === "string" &&
+            (question.type === "multiple-selection" ||
+              question.type === "drag-drop")
+          ) {
+            processedAnswer = JSON.parse(answer);
+          }
+        } catch (e) {
+          console.error("Error processing answer:", e);
+        }
+
+        return { ...acc, [qId]: processedAnswer };
+      }, {});
+
+      // Calculate score
+      const score = quiz.questions.reduce((acc, q) => {
+        const processedAnswer = processedAnswers[q.id];
+        let isCorrect = false;
+
+        switch (q.type) {
+          case "multiple-selection":
+            const correctAnswers = Array.isArray(q.multiple_correct_answers)
+              ? q.multiple_correct_answers
+              : typeof q.multiple_correct_answers === "string" &&
+                q.multiple_correct_answers
+              ? safeJSONParse(q.multiple_correct_answers) || []
+              : [];
+            isCorrect =
+              JSON.stringify(processedAnswer?.sort()) ===
+              JSON.stringify(correctAnswers.sort());
+            break;
+
+          case "drag-drop":
+            const correctDragAnswers = q.dragDropAnswers || [];
+            const studentDragAnswers = Array.isArray(processedAnswer)
+              ? processedAnswer
+              : typeof processedAnswer === "string"
+              ? JSON.parse(processedAnswer)
+              : [];
+            isCorrect =
+              JSON.stringify(studentDragAnswers) ===
+              JSON.stringify(correctDragAnswers);
+            break;
+
+          default:
+            isCorrect =
+              String(processedAnswer).toLowerCase() ===
+              String(q.correct_answer).toLowerCase();
+        }
+
+        return acc + (isCorrect ? 1 : 0);
+      }, 0);
+
+      // Submit to database
+      const { error: submissionError } = await supabase
+        .from("quiz_submissions")
+        .insert({
+          student_id: user.id,
+          quiz_id: id,
+          answers: processedAnswers,
+          score: Math.round((score / quiz.questions.length) * 100),
+          total_questions: quiz.questions.length,
+          correct_answers: score,
+        });
+
+      if (submissionError) throw new Error("Failed to submit quiz");
+
+      showSuccess(
+        "Submission Successful",
+        "Your quiz has been submitted successfully!"
+      );
+      setQuizSubmitted(true);
+
+      // Delay redirect to show success message
+      setTimeout(() => {
+        router.push(`/stdinbox`);
+      }, 2000);
+    } catch (error) {
+      showError(
+        "Submission Error",
+        `Failed to submit quiz: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  // No dependencies needed as this is a pure function
+
+  // Effect for fetching quiz and student info
   useEffect(() => {
     const fetchQuizAndStudentInfo = async () => {
       if (typeof id !== "string") {
@@ -296,16 +587,24 @@ const TakeQuiz: React.FC = () => {
     };
 
     fetchQuizAndStudentInfo();
-  }, [id, supabase, hashCode, shuffleArray, showError]);
+  }, [
+    id,
+    supabase,
+    hashCode,
+    shuffleArray,
+    showError,
+    validateQuestionOptions,
+  ]);
 
+  // Timer effect
   useEffect(() => {
     if (timeLeft === null || timeLeft <= 0 || quizSubmitted) return;
 
-    const timer = setInterval(
-      () => setTimeLeft((prev) => {
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
         if (prev !== null && prev > 0) {
           const newTime = prev - 1;
-          if (newTime === 300) { // 5 minutes warning
+          if (newTime === 300) {
             showError(
               "Time Warning",
               "You have 5 minutes remaining to complete the quiz."
@@ -314,425 +613,283 @@ const TakeQuiz: React.FC = () => {
           return newTime;
         }
         return 0;
-      }),
-      1000
-    );
+      });
+    }, 1000);
 
     return () => clearInterval(timer);
   }, [timeLeft, quizSubmitted, showError]);
 
-  const validateQuestionOptions = useCallback((question: BaseQuestion): string[] | null => {
-    let parsedOptions = question.options;
+  const renderQuestionOptions = (question: BaseQuestion) => {
+    const enhancedQuestion = {
+      ...question,
+      options:
+        typeof question.options === "string"
+          ? safeJSONParse(question.options)
+          : question.options,
+      multiple_correct_answers: (() => {
+        if (Array.isArray(question.multiple_correct_answers)) {
+          return question.multiple_correct_answers;
+        }
+        if (
+          typeof question.multiple_correct_answers === "string" &&
+          question.multiple_correct_answers
+        ) {
+          return safeJSONParse(question.multiple_correct_answers) || [];
+        }
+        return [];
+      })(),
+    };
 
-    if (typeof question.options === "string") {
-      parsedOptions = safeJSONParse(question.options);
+    let currentAnswer: AnswerType = answers[question.id] || "";
+    if (
+      typeof currentAnswer === "string" &&
+      (question.type === "multiple-selection" || question.type === "drag-drop")
+    ) {
+      try {
+        currentAnswer = currentAnswer ? JSON.parse(currentAnswer) : [];
+      } catch (e) {
+        console.error("Error parsing answer:", e);
+        currentAnswer = [];
+      }
     }
+
+    const commonProps = {
+      question: enhancedQuestion,
+      answers: {
+        ...answers,
+        [question.id]: currentAnswer,
+      } as Answers,
+      handleAnswer,
+      showExplanation: false,
+    };
 
     switch (question.type) {
       case "multiple-choice":
-      case "multiple-selection":
-        if (
-          Array.isArray(parsedOptions) &&
-          parsedOptions.every((opt) => typeof opt === "string")
-        ) {
-          return parsedOptions.map((opt) => opt.trim());
-        }
-        return null;
+        return enhancedQuestion.options ? (
+          <MultipleChoice {...commonProps} />
+        ) : (
+          <p className="text-red-500">
+            No options available for this question.
+          </p>
+        );
 
       case "true-false":
-        return ["True", "False"];
+        return <TrueFalse {...commonProps} />;
 
       case "short-answer":
+        return <ShortAnswer {...commonProps} />;
+
+      case "multiple-selection":
+        return enhancedQuestion.options ? (
+          <MultipleSelection {...commonProps} />
+        ) : (
+          <p className="text-red-500">
+            No options available for this question.
+          </p>
+        );
+
       case "drag-drop":
-        return null;
+        return <DragDrop {...commonProps} />;
 
       default:
-        console.warn(`Unexpected question type: ${question.type}`);
+        showError(
+          "Question Error",
+          `Unexpected question type: ${question.type}`
+        );
         return null;
     }
-  }, []);
-
-  const handleAnswer = useCallback((questionId: string, answer: AnswerType) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]:
-        typeof answer === "string" ? answer : JSON.stringify(answer),
-    }));
-  }, []);
-
-  const handleNavigation = useCallback((direction: "next" | "prev") => {
-    if (!quiz) return;
-    const newIndex =
-      direction === "next"
-        ? currentQuestionIndex + 1
-        : currentQuestionIndex - 1;
-    if (newIndex >= 0 && newIndex < quiz.questions.length) {
-      setCurrentQuestionIndex(newIndex);
-    }
-  }, [quiz, currentQuestionIndex]);
-
-  const handleSubmitQuiz = async () => {
-    if (!quiz || typeof id !== "string") {
-      showError("Submission Error", "Unable to submit quiz. Please try again.");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw new Error("Authentication error during submission");
-      if (!user) throw new Error("No authenticated user found");
-
-      const processedAnswers = Object.entries(answers).reduce<Record<string, any>>(
-        (acc, [qId, answer]) => {
-          const question = quiz.questions.find((q) => q.id === qId);
-          if (!question) return acc;
-
-          let processedAnswer = answer;
-          try {
-            if (
-              typeof answer === "string" &&
-              (question.type === "multiple-selection" ||
-                question.type === "drag-drop")
-            ) {
-              processedAnswer = JSON.parse(answer);
-            }
-          } catch (e) {
-            console.error("Error processing answer:", e);
-          }
-
-          return { ...acc, [qId]: processedAnswer };
-        },
-        {}
-      );
-
-      // Calculate score
-      const score = quiz.questions.reduce((acc, q) => {
-        const processedAnswer = processedAnswers[q.id];
-        let isCorrect = false;
-
-        switch (q.type) {
-          case "multiple-selection":
-            const correctAnswers = Array.isArray(q.multiple_correct_answers)
-              ? q.multiple_correct_answers
-              : typeof q.multiple_correct_answers === "string" &&
-                q.multiple_correct_answers
-              ? safeJSONParse(q.multiple_correct_answers) || []
-              : [];
-            isCorrect =
-              JSON.stringify(processedAnswer?.sort()) ===
-              JSON.stringify(correctAnswers.sort());
-            break;
-
-          case "drag-drop":
-            const correctDragAnswers = q.dragDropAnswers || [];
-            const studentDragAnswers = Array.isArray(processedAnswer)
-              ? processedAnswer
-              : typeof processedAnswer === "string"
-              ? JSON.parse(processedAnswer)
-              : [];
-            isCorrect =
-              JSON.stringify(studentDragAnswers) ===
-              JSON.stringify(correctDragAnswers);
-            break;
-
-          default:
-            isCorrect =
-              String(processedAnswer).toLowerCase() ===
-              String(q.correct_answer).toLowerCase();
-        }
-
-        return acc + (isCorrect ? 1 : 0);
-      }, 0);
-
-      // Submit to database
-      const { error: submissionError } = await supabase
-        .from("quiz_submissions")
-        .insert({
-          student_id: user.id,
-          quiz_id: id,
-          answers: processedAnswers,
-          score: Math.round((score / quiz.questions.length) * 100),
-          total_questions: quiz.questions.length,
-          correct_answers: score,
-        });
-
-      if (submissionError) throw new Error("Failed to submit quiz");
-
-      showSuccess(
-        "Submission Successful",
-        "Your quiz has been submitted successfully!"
-      );
-      setQuizSubmitted(true);
-      
-      // Delay redirect to show success message
-      setTimeout(() => {
-        router.push(`/stdinbox`);
-      }, 2000);
-    } catch (error) {
-      showError(
-        "Submission Error",
-        `Failed to submit quiz: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
-  // Render functions...
-// Render functions for quiz page
-const renderQuestionOptions = (question: BaseQuestion) => {
-  const enhancedQuestion = {
-    ...question,
-    options:
-      typeof question.options === "string"
-        ? safeJSONParse(question.options)
-        : question.options,
-    multiple_correct_answers: (() => {
-      if (Array.isArray(question.multiple_correct_answers)) {
-        return question.multiple_correct_answers;
-      }
+  const formatAnswer = (question: BaseQuestion, answer: any): string => {
+    try {
       if (
-        typeof question.multiple_correct_answers === "string" &&
-        question.multiple_correct_answers
+        typeof answer === "string" &&
+        (question.type === "multiple-selection" ||
+          question.type === "drag-drop")
       ) {
-        return safeJSONParse(question.multiple_correct_answers) || [];
+        const parsed = JSON.parse(answer);
+        return Array.isArray(parsed) ? parsed.join(", ") : answer;
       }
-      return [];
-    })(),
-  };
-
-  let currentAnswer: AnswerType = answers[question.id] || "";
-  if (
-    typeof currentAnswer === "string" &&
-    (question.type === "multiple-selection" || question.type === "drag-drop")
-  ) {
-    try {
-      currentAnswer = currentAnswer ? JSON.parse(currentAnswer) : [];
+      return String(answer);
     } catch (e) {
-      console.error("Error parsing answer:", e);
-      currentAnswer = [];
+      console.error("Error formatting answer:", e);
+      return String(answer);
     }
-  }
-
-  const commonProps = {
-    question: enhancedQuestion,
-    answers: {
-      ...answers,
-      [question.id]: currentAnswer,
-    } as Answers,
-    handleAnswer,
-    showExplanation: false,
   };
 
-  switch (question.type) {
-    case "multiple-choice":
-      return enhancedQuestion.options ? (
-        <MultipleChoice {...commonProps} />
-      ) : (
-        <p className="text-red-500">
-          No options available for this question.
+  const renderAnswerReview = (question: BaseQuestion, index: number) => {
+    const answer = answers[question.id];
+    const formattedAnswer = answer
+      ? formatAnswer(question, answer)
+      : "Not answered";
+
+    return (
+      <div key={question.id} className="p-4 bg-gray-50 rounded-lg mb-4">
+        <p className="font-semibold">
+          Question {index + 1}: {question.text}
         </p>
-      );
-
-    case "true-false":
-      return <TrueFalse {...commonProps} />;
-
-    case "short-answer":
-      return <ShortAnswer {...commonProps} />;
-
-    case "multiple-selection":
-      return enhancedQuestion.options ? (
-        <MultipleSelection {...commonProps} />
-      ) : (
-        <p className="text-red-500">
-          No options available for this question.
+        <p className={`mt-2 ${answer ? "text-blue-600" : "text-yellow-600"}`}>
+          Your answer: {formattedAnswer}
         </p>
-      );
-
-    case "drag-drop":
-      return <DragDrop {...commonProps} />;
-
-    default:
-      showError(
-        "Question Error",
-        `Unexpected question type: ${question.type}`
-      );
-      return null;
-  }
-};
-
-const formatAnswer = (question: BaseQuestion, answer: any): string => {
-  try {
-    if (
-      typeof answer === "string" &&
-      (question.type === "multiple-selection" || question.type === "drag-drop")
-    ) {
-      const parsed = JSON.parse(answer);
-      return Array.isArray(parsed) ? parsed.join(", ") : answer;
-    }
-    return String(answer);
-  } catch (e) {
-    console.error("Error formatting answer:", e);
-    return String(answer);
-  }
-};
-
-const renderAnswerReview = (question: BaseQuestion, index: number) => {
-  const answer = answers[question.id];
-  const formattedAnswer = answer ? formatAnswer(question, answer) : "Not answered";
-
-  return (
-    <div key={question.id} className="p-4 bg-gray-50 rounded-lg mb-4">
-      <p className="font-semibold">Question {index + 1}: {question.text}</p>
-      <p className={`mt-2 ${answer ? "text-blue-600" : "text-yellow-600"}`}>
-        Your answer: {formattedAnswer}
-      </p>
-    </div>
-  );
-};
-
-const renderConfirmationContent = () => {
-  if (!quiz) return null;
-
-  const answeredQuestions = quiz.questions.filter(q => q.id in answers && answers[q.id] !== "");
-  const unansweredQuestions = quiz.questions.filter(q => !(q.id in answers) || answers[q.id] === "");
-
-  return (
-    <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
-      <div className="mb-4">
-        <p className="font-semibold text-lg mb-2">Quiz Summary:</p>
-        <p>Total Questions: {quiz.questions.length}</p>
-        <p className="text-green-600">Answered: {answeredQuestions.length}</p>
-        <p className="text-yellow-600">Unanswered: {unansweredQuestions.length}</p>
       </div>
+    );
+  };
 
-      {unansweredQuestions.length > 0 && (
-        <div className="mb-4 p-4 bg-yellow-50 rounded-lg">
-          <p className="font-semibold text-yellow-700">Warning:</p>
+  const renderConfirmationContent = () => {
+    if (!quiz) return null;
+
+    const answeredQuestions = quiz.questions.filter(
+      (q) => q.id in answers && answers[q.id] !== ""
+    );
+    const unansweredQuestions = quiz.questions.filter(
+      (q) => !(q.id in answers) || answers[q.id] === ""
+    );
+
+    return (
+      <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
+        <div className="mb-4">
+          <p className="font-semibold text-lg mb-2">Quiz Summary:</p>
+          <p>Total Questions: {quiz.questions.length}</p>
+          <p className="text-green-600">Answered: {answeredQuestions.length}</p>
           <p className="text-yellow-600">
-            You have {unansweredQuestions.length} unanswered {
-              unansweredQuestions.length === 1 ? "question" : "questions"
-            }. Are you sure you want to submit?
+            Unanswered: {unansweredQuestions.length}
           </p>
         </div>
-      )}
 
-      <div className="mt-4">
-        <p className="font-semibold mb-2">Your Answers:</p>
-        {quiz.questions.map((question, index) => 
-          renderAnswerReview(question, index)
+        {unansweredQuestions.length > 0 && (
+          <div className="mb-4 p-4 bg-yellow-50 rounded-lg">
+            <p className="font-semibold text-yellow-700">Warning:</p>
+            <p className="text-yellow-600">
+              You have {unansweredQuestions.length} unanswered{" "}
+              {unansweredQuestions.length === 1 ? "question" : "questions"}. Are
+              you sure you want to submit?
+            </p>
+          </div>
         )}
+
+        <div className="mt-4">
+          <p className="font-semibold mb-2">Your Answers:</p>
+          {quiz.questions.map((question, index) =>
+            renderAnswerReview(question, index)
+          )}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
-const renderTimeRemaining = () => {
-  if (timeLeft === null) return null;
+  const renderTimeRemaining = () => {
+    if (timeLeft === null) return null;
 
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
-  
-  const timeClass = minutes < 5 
-    ? "text-red-600"
-    : minutes < 10 
-      ? "text-yellow-600" 
-      : "text-blue-600";
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
 
-  return (
-    <p className={`text-sm font-bold ${timeClass}`}>
-      Time remaining: {minutes}:{seconds.toString().padStart(2, "0")}
-    </p>
-  );
-};
+    const timeClass =
+      minutes < 5
+        ? "text-red-600"
+        : minutes < 10
+        ? "text-yellow-600"
+        : "text-blue-600";
 
-const renderQuestionNavigation = () => {
-  if (!quiz) return null;
+    return (
+      <p className={`text-sm font-bold ${timeClass}`}>
+        Time remaining: {minutes}:{seconds.toString().padStart(2, "0")}
+      </p>
+    );
+  };
 
-  const totalQuestions = quiz.questions.length;
-  const currentProgress = ((currentQuestionIndex + 1) / totalQuestions) * 100;
+  const renderQuestionNavigation = () => {
+    if (!quiz) return null;
 
-  return (
-    <div className="mt-4">
-      <div className="flex justify-between text-sm text-gray-600 mb-2">
-        <span>Question {currentQuestionIndex + 1} of {totalQuestions}</span>
-        <span>{Math.round(currentProgress)}% Complete</span>
+    const totalQuestions = quiz.questions.length;
+    const currentProgress = ((currentQuestionIndex + 1) / totalQuestions) * 100;
+
+    return (
+      <div className="mt-4">
+        <div className="flex justify-between text-sm text-gray-600 mb-2">
+          <span>
+            Question {currentQuestionIndex + 1} of {totalQuestions}
+          </span>
+          <span>{Math.round(currentProgress)}% Complete</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div
+            className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+            style={{ width: `${currentProgress}%` }}
+          />
+        </div>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-2">
-        <div
-          className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
-          style={{ width: `${currentProgress}%` }}
-        />
-      </div>
-    </div>
-  );
-};
+    );
+  };
 
-const Modal: React.FC<ModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  title, 
-  message, 
-  isError = false,
-  children 
-}) => {
-  if (!isOpen) return null;
+  const Modal: React.FC<ModalProps> = ({
+    isOpen,
+    onClose,
+    title,
+    message,
+    isError = false,
+    children,
+  }) => {
+    if (!isOpen) return null;
 
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-        onClick={onClose}
-      >
+    return (
+      <AnimatePresence>
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.8, opacity: 0 }}
-          className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full m-4"
-          onClick={(e) => e.stopPropagation()}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={onClose}
         >
-          <h2 className={`text-2xl font-bold mb-4 ${isError ? 'text-red-600' : 'text-green-600'}`}>{title}</h2>
-          <p className="mb-4">{message}</p>
-          {children} {/* Added this line to render children */}
-          {!children && ( // Only show default button if no children are provided
-            <button
-              onClick={onClose}
-              className={`w-full mt-4 px-4 py-2 rounded-md text-white transition duration-200 ${
-                isError ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full m-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              className={`text-2xl font-bold mb-4 ${
+                isError ? "text-red-600" : "text-green-600"
               }`}
             >
-              Close
-            </button>
-          )}
+              {title}
+            </h2>
+            <p className="mb-4">{message}</p>
+            {children} {/* Added this line to render children */}
+            {!children && ( // Only show default button if no children are provided
+              <button
+                onClick={onClose}
+                className={`w-full mt-4 px-4 py-2 rounded-md text-white transition duration-200 ${
+                  isError
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "bg-green-500 hover:bg-green-600"
+                }`}
+              >
+                Close
+              </button>
+            )}
+          </motion.div>
         </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-};
+      </AnimatePresence>
+    );
+  };
 
-const isAnswerEmpty = (answer: AnswerType): boolean => {
-  if (!answer) return true;
-  if (typeof answer === "string") {
-    try {
-      const parsedAnswer = JSON.parse(answer);
-      if (Array.isArray(parsedAnswer)) {
-        return parsedAnswer.length === 0;
+  const isAnswerEmpty = (answer: AnswerType): boolean => {
+    if (!answer) return true;
+    if (typeof answer === "string") {
+      try {
+        const parsedAnswer = JSON.parse(answer);
+        if (Array.isArray(parsedAnswer)) {
+          return parsedAnswer.length === 0;
+        }
+        return answer.trim() === "";
+      } catch {
+        return answer.trim() === "";
       }
-      return answer.trim() === "";
-    } catch {
-      return answer.trim() === "";
     }
-  }
-  if (Array.isArray(answer)) return answer.length === 0;
-  return true;
-};
+    if (Array.isArray(answer)) return answer.length === 0;
+    return true;
+  };
 
   if (loading) {
     return (
@@ -744,7 +901,7 @@ const isAnswerEmpty = (answer: AnswerType): boolean => {
 
   // Return statement with error boundary
   return (
-<ErrorBoundary onError={handleError}>
+    <ErrorBoundary onError={handleError}>
       {modalState.isOpen && (
         <Modal
           isOpen={modalState.isOpen}
@@ -758,14 +915,18 @@ const isAnswerEmpty = (answer: AnswerType): boolean => {
       {confirmationModal.isOpen && (
         <Modal
           isOpen={confirmationModal.isOpen}
-          onClose={() => setConfirmationModal(prev => ({ ...prev, isOpen: false }))}
+          onClose={() =>
+            setConfirmationModal((prev) => ({ ...prev, isOpen: false }))
+          }
           title="Confirm Submission"
           message="Are you sure you want to submit your quiz? Make sure you have reviewed all your answers."
           isError={false}
         >
           <div className="flex justify-end space-x-4 mt-4">
             <button
-              onClick={() => setConfirmationModal(prev => ({ ...prev, isOpen: false }))}
+              onClick={() =>
+                setConfirmationModal((prev) => ({ ...prev, isOpen: false }))
+              }
               className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
             >
               Cancel
@@ -824,7 +985,7 @@ const isAnswerEmpty = (answer: AnswerType): boolean => {
             <div className="space-y-2">
               {quiz?.questions.map((q, index) => {
                 const isAnswered = q.id in answers && answers[q.id] !== "";
-                
+
                 return (
                   <button
                     key={q.id}
@@ -858,9 +1019,10 @@ const isAnswerEmpty = (answer: AnswerType): boolean => {
                 className="bg-white shadow-xl rounded-lg p-8"
               >
                 <h2 className="text-xl font-bold mb-4">
-                  Question {currentQuestionIndex + 1} of {quiz?.questions.length}
+                  Question {currentQuestionIndex + 1} of{" "}
+                  {quiz?.questions.length}
                 </h2>
-                
+
                 {quiz?.questions[currentQuestionIndex] && (
                   <>
                     <p className="text-lg mb-6">
@@ -879,7 +1041,9 @@ const isAnswerEmpty = (answer: AnswerType): boolean => {
                       </div>
                     )}
 
-                    {renderQuestionOptions(quiz.questions[currentQuestionIndex])}
+                    {renderQuestionOptions(
+                      quiz.questions[currentQuestionIndex]
+                    )}
 
                     <div className="flex justify-between mt-6">
                       <button
@@ -892,7 +1056,12 @@ const isAnswerEmpty = (answer: AnswerType): boolean => {
 
                       {currentQuestionIndex === quiz.questions.length - 1 ? (
                         <button
-                          onClick={() => setConfirmationModal(prev => ({ ...prev, isOpen: true }))}
+                          onClick={() =>
+                            setConfirmationModal((prev) => ({
+                              ...prev,
+                              isOpen: true,
+                            }))
+                          }
                           className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors duration-150"
                         >
                           Submit Quiz
