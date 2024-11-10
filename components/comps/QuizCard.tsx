@@ -28,6 +28,14 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, status }) => {
     completed: "bg-blue-100 text-blue-800"
   };
 
+  // Determine the link URL based on the quiz status
+  const getLinkUrl = () => {
+    if (status === "completed") {
+      return "/stdinbox"; // Redirect completed quizzes to inbox
+    }
+    return `/stdquiz/${quiz.id}`; // Default path for active and upcoming quizzes
+  };
+
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
@@ -50,7 +58,7 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, status }) => {
             <span className="font-semibold">Duration:</span> {quiz.duration_minutes} minutes
           </p>
         )}
-        <Link legacyBehavior href={`/stdquiz/${quiz.id}`}>
+        <Link legacyBehavior href={getLinkUrl()}>
           <a className={`block w-full py-2 text-center rounded-md transition-colors duration-200 ${
             status === "active" ? "bg-green-500 hover:bg-green-600 text-white" :
             status === "upcoming" ? "bg-yellow-500 hover:bg-yellow-600 text-white" :
