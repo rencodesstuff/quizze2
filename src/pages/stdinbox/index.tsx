@@ -206,7 +206,7 @@ const StudentQuizHistory: React.FC = () => {
         </svg>
         <Title className="text-xl font-semibold text-gray-700">No Quizzes Completed Yet</Title>
         <Text className="text-gray-500 max-w-sm">
-          You haven't completed any quizzes yet. Start taking quizzes to see your performance analytics here!
+          You haven&apos;t completed any quizzes yet. Start taking quizzes to see your performance analytics here!
         </Text>
         <Button
           size="lg"
