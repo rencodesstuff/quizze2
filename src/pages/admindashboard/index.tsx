@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from "@/comps/admin-layout";
-import { UserIcon, ClipboardListIcon, AcademicCapIcon, ChartBarIcon } from '@heroicons/react/outline';
+import { UserIcon, ClipboardListIcon, AcademicCapIcon, ChartBarIcon, InboxIcon, ChartSquareBarIcon } from '@heroicons/react/outline';
 import { Tab } from '@headlessui/react';
 import {
   Card,
@@ -23,6 +23,7 @@ import {
 } from "@tremor/react";
 import { createClient } from '../../../utils/supabase/component';
 
+// Interface definitions remain the same...
 interface DashboardStats {
   totalUsers: number;
   totalQuizzes: number;
@@ -71,6 +72,7 @@ interface QuizData {
 }
 
 const AdminDashboard: React.FC = () => {
+  // State definitions remain the same...
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     totalQuizzes: 0,
@@ -86,6 +88,7 @@ const AdminDashboard: React.FC = () => {
 
   const supabase = createClient();
 
+  // Helper functions remain the same...
   const formatRelativeTime = (date: string) => {
     const now = new Date();
     const past = new Date(date);
@@ -294,7 +297,6 @@ const AdminDashboard: React.FC = () => {
         
         if (error || !data) {
           console.error('User is not an admin:', error);
-          // Handle non-admin user (e.g., redirect to login page)
         } else {
           fetchDashboardStats();
           fetchRecentActivities();
@@ -305,12 +307,32 @@ const AdminDashboard: React.FC = () => {
         }
       } else {
         console.error('No user authenticated');
-        // Handle unauthenticated user (e.g., redirect to login page)
       }
     };
 
     checkAdminStatus();
   }, []);
+
+  // Empty state components
+  const EmptyActivities = () => (
+    <div className="flex flex-col items-center justify-center py-8">
+      <InboxIcon className="h-12 w-12 text-gray-400 mb-3" />
+      <Text className="text-gray-600 text-center">No recent activities yet</Text>
+      <Text className="text-gray-500 text-sm text-center mt-1">
+        Activities will appear here as users interact with the platform
+      </Text>
+    </div>
+  );
+
+  const EmptyQuizzes = () => (
+    <div className="flex flex-col items-center justify-center py-8">
+      <ChartSquareBarIcon className="h-12 w-12 text-gray-400 mb-3" />
+      <Text className="text-gray-600 text-center">No quiz data available</Text>
+      <Text className="text-gray-500 text-sm text-center mt-1">
+        Performance data will appear once quizzes are completed
+      </Text>
+    </div>
+  );
 
   return (
     <AdminLayout>
@@ -358,49 +380,57 @@ const AdminDashboard: React.FC = () => {
         <Grid numItemsLg={2} className="gap-8 mb-8">
           <Card>
             <Title className="text-gray-900">Recent Activity</Title>
-            <List className="mt-4">
-              {recentActivities.map((activity, index) => (
-                <ListItem key={index}>
-                  <Flex justifyContent="start" className="truncate space-x-4">
-                    <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
-                    <div className="truncate">
-                      <Text className="truncate font-semibold text-gray-900">
-                        {activity.action}
-                      </Text>
-                      <Text className="truncate text-gray-600">
-                        {activity.subject} • {activity.time}
-                      </Text>
-                    </div>
-                  </Flex>
-                </ListItem>
-              ))}
-            </List>
+            {recentActivities.length > 0 ? (
+              <List className="mt-4">
+                {recentActivities.map((activity, index) => (
+                  <ListItem key={index}>
+                    <Flex justifyContent="start" className="truncate space-x-4">
+                      <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                      <div className="truncate">
+                        <Text className="truncate font-semibold text-gray-900">
+                          {activity.action}
+                        </Text>
+                        <Text className="truncate text-gray-600">
+                          {activity.subject} • {activity.time}
+                        </Text>
+                      </div>
+                    </Flex>
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <EmptyActivities />
+            )}
           </Card>
 
           <Card>
             <Title className="text-gray-900">Top Performing Quizzes</Title>
-            <Table className="mt-4">
-              <TableHead>
-                <TableRow>
-                  <TableHeaderCell className="text-gray-900">Quiz Name</TableHeaderCell>
-                  <TableHeaderCell className="text-right text-gray-900">Completions</TableHeaderCell>
-                  <TableHeaderCell className="text-right text-gray-900">Avg. Score</TableHeaderCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {topQuizzes.map((quiz) => (
-                  <TableRow key={quiz.name}>
-                    <TableCell className="text-gray-900">{quiz.name}</TableCell>
-                    <TableCell className="text-right text-gray-700">{quiz.completions}</TableCell>
-                    <TableCell className="text-right">
-                      <Badge color="green" className="text-white font-medium">
-                        {quiz.avgScore.toFixed(2)}%
-                      </Badge>
-                    </TableCell>
+            {topQuizzes.length > 0 ? (
+              <Table className="mt-4">
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell className="text-gray-900">Quiz Name</TableHeaderCell>
+                    <TableHeaderCell className="text-right text-gray-900">Completions</TableHeaderCell>
+                    <TableHeaderCell className="text-right text-gray-900">Avg. Score</TableHeaderCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {topQuizzes.map((quiz) => (
+                    <TableRow key={quiz.name}>
+                      <TableCell className="text-gray-900">{quiz.name}</TableCell>
+                      <TableCell className="text-right text-gray-700">{quiz.completions}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge color="green" className="text-white font-medium">
+                          {quiz.avgScore.toFixed(2)}%
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <EmptyQuizzes />
+            )}
           </Card>
         </Grid>
 
@@ -412,13 +442,13 @@ const AdminDashboard: React.FC = () => {
               <Bold>Daily Active Users:</Bold> {dailyActiveUsers}
             </Text>
           </Flex>
-          <ProgressBar value={dailyActiveUsers / stats.totalUsers * 100} className="mt-2" />
+          <ProgressBar value={dailyActiveUsers / (stats.totalUsers || 1) * 100} className="mt-2" />
         </Card>
 
         {/* Recent Users and Quizzes */}
         <Card>
           <Tab.Group>
-          <Tab.List className="flex space-x-4 border-b">
+            <Tab.List className="flex space-x-4 border-b">
               <Tab className={({ selected }) =>
                 `py-2 px-4 font-medium focus:outline-none ${
                   selected ? 'text-red-600 border-b-2 border-red-600' : 'text-gray-700 hover:text-gray-900'
@@ -436,52 +466,66 @@ const AdminDashboard: React.FC = () => {
             </Tab.List>
             <Tab.Panels className="mt-4">
               <Tab.Panel>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableHeaderCell className="text-gray-900">Name</TableHeaderCell>
-                      <TableHeaderCell className="text-gray-900">Email</TableHeaderCell>
-                      <TableHeaderCell className="text-gray-900">Role</TableHeaderCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {recentUsers.map((user) => (
-                      <TableRow key={user.email}>
-                        <TableCell className="text-gray-900">{user.name}</TableCell>
-                        <TableCell className="text-gray-700">{user.email}</TableCell>
-                        <TableCell>
-                          <Badge color={user.role === 'student' ? 'blue' : 'green'} className="text-white font-medium">
-                            {user.role}
-                          </Badge>
-                        </TableCell>
+                {recentUsers.length > 0 ? (
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableHeaderCell className="text-gray-900">Name</TableHeaderCell>
+                        <TableHeaderCell className="text-gray-900">Email</TableHeaderCell>
+                        <TableHeaderCell className="text-gray-900">Role</TableHeaderCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHead>
+                    <TableBody>
+                      {recentUsers.map((user) => (
+                        <TableRow key={user.email}>
+                          <TableCell className="text-gray-900">{user.name}</TableCell>
+                          <TableCell className="text-gray-700">{user.email}</TableCell>
+                          <TableCell>
+                            <Badge color={user.role === 'student' ? 'blue' : 'green'} className="text-white font-medium">
+                              {user.role}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <UserIcon className="h-12 w-12 text-gray-400 mb-3" />
+                    <Text className="text-gray-600">No users registered yet</Text>
+                  </div>
+                )}
               </Tab.Panel>
               <Tab.Panel>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableHeaderCell className="text-gray-900">Quiz Name</TableHeaderCell>
-                      <TableHeaderCell className="text-gray-900">Creator</TableHeaderCell>
-                      <TableHeaderCell className="text-gray-900">Status</TableHeaderCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {recentQuizzes.map((quiz) => (
-                      <TableRow key={quiz.name}>
-                        <TableCell className="text-gray-900">{quiz.name}</TableCell>
-                        <TableCell className="text-gray-700">{quiz.creator}</TableCell>
-                        <TableCell>
-                          <Badge color={quiz.status === 'active' ? 'green' : 'yellow'} className="text-white font-medium">
-                            {quiz.status}
-                          </Badge>
-                        </TableCell>
+                {recentQuizzes.length > 0 ? (
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableHeaderCell className="text-gray-900">Quiz Name</TableHeaderCell>
+                        <TableHeaderCell className="text-gray-900">Creator</TableHeaderCell>
+                        <TableHeaderCell className="text-gray-900">Status</TableHeaderCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHead>
+                    <TableBody>
+                      {recentQuizzes.map((quiz) => (
+                        <TableRow key={quiz.name}>
+                          <TableCell className="text-gray-900">{quiz.name}</TableCell>
+                          <TableCell className="text-gray-700">{quiz.creator}</TableCell>
+                          <TableCell>
+                            <Badge color={quiz.status === 'active' ? 'green' : 'yellow'} className="text-white font-medium">
+                              {quiz.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <ClipboardListIcon className="h-12 w-12 text-gray-400 mb-3" />
+                    <Text className="text-gray-600">No quizzes created yet</Text>
+                  </div>
+                )}
               </Tab.Panel>
             </Tab.Panels>
           </Tab.Group>

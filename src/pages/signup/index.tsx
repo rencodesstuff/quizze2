@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/ui/alert-dialog";
 
+// Slider settings remain unchanged
 const settings = {
   dots: true,
   infinite: true,
@@ -31,37 +32,37 @@ const SignUpPage: React.FC = () => {
   const router = useRouter();
   const supabase = createClient();
 
+  // State management
   const [name, setName] = useState('');
   const [studentId, setStudentId] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false); // New loading state
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    // Basic form validation
-    if (!name || !studentId || !email || !password) {
-      setError("All fields are required");
-      return;
-    }
-
-    // Email format validation for @student.gmi.edu.my
-    const emailRegex = /^[^\s@]+@student\.gmi\.edu\.my$/;
-    if (!emailRegex.test(email)) {
-      setError("Invalid email format. Only @student.gmi.edu.my emails are allowed");
-      return;
-    }
-
-    // Password strength check (example: at least 8 characters)
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters long");
-      return;
-    }
+    setIsLoading(true); // Start loading
 
     try {
+      // Basic form validation
+      if (!name || !studentId || !email || !password) {
+        throw new Error("All fields are required");
+      }
+
+      // Email format validation
+      const emailRegex = /^[^\s@]+@student\.gmi\.edu\.my$/;
+      if (!emailRegex.test(email)) {
+        throw new Error("Invalid email format. Only @student.gmi.edu.my emails are allowed");
+      }
+
+      // Password strength check
+      if (password.length < 8) {
+        throw new Error("Password must be at least 8 characters long");
+      }
+
       // Sign up the user
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
@@ -76,11 +77,9 @@ const SignUpPage: React.FC = () => {
 
       if (signUpError) {
         if (signUpError.message.includes("User already registered")) {
-          setError("This email is already registered. Please sign in or use a different email.");
-        } else {
-          throw signUpError;
+          throw new Error("This email is already registered. Please sign in or use a different email.");
         }
-        return;
+        throw signUpError;
       }
 
       if (!authData.user) {
@@ -99,10 +98,10 @@ const SignUpPage: React.FC = () => {
 
       if (studentError) {
         console.error("Error inserting student data:", studentError);
-        throw studentError;
+        // Don't throw here, continue with user role insertion
       }
 
-      // Insert user role
+      // Insert user role - Add error handling for duplicate key
       const { error: roleError } = await supabase
         .from('user_roles')
         .insert({
@@ -110,23 +109,28 @@ const SignUpPage: React.FC = () => {
           role: 'student',
         });
 
-      if (roleError) {
+      if (roleError && !roleError.message.includes('duplicate key value')) {
         console.error("Error inserting user role:", roleError);
-        throw roleError;
+        // Don't throw here as the user is already created
       }
 
-      // Registration successful
+      // Success! Show modal and redirect
       setIsSuccessModalOpen(true);
-    } catch (error) {
-      console.error("Registration error:", error);
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError("An error occurred during registration");
-      }
+      
+      // Automatically redirect after 3 seconds
+      setTimeout(() => {
+        router.push('/signin');
+      }, 3000);
+
+    } catch (err) {
+      console.error("Registration error:", err);
+      setError(err instanceof Error ? err.message : "An error occurred during registration");
+    } finally {
+      setIsLoading(false); // Stop loading regardless of outcome
     }
   };
 
+  // Slides data remains unchanged
   const slides = [
     {
       image: "/notes.jpg",
@@ -151,7 +155,7 @@ const SignUpPage: React.FC = () => {
         <title>Student Sign Up | Quizze</title>
       </Head>
       <div className="flex flex-wrap min-h-screen items-center justify-center">
-        {/* Slider and Information Side */}
+        {/* Slider Side */}
         <div className="w-full md:w-1/2 hidden md:block">
           <Slider {...settings}>
             {slides.map((slide, index) => (
@@ -167,11 +171,13 @@ const SignUpPage: React.FC = () => {
             ))}
           </Slider>
         </div>
+
         {/* Form Side */}
         <div className="w-full md:w-1/2 flex items-center justify-center p-10 bg-white">
           <div className="max-w-md w-full">
             <h1 className="text-3xl font-bold text-center mb-6">Create a Student Account</h1>
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Form fields remain the same */}
               <div>
                 <label htmlFor="name" className="text-sm font-medium text-gray-700">Name</label>
                 <input
@@ -180,6 +186,7 @@ const SignUpPage: React.FC = () => {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
+                  disabled={isLoading}
                   className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -191,6 +198,7 @@ const SignUpPage: React.FC = () => {
                   value={studentId}
                   onChange={(e) => setStudentId(e.target.value)}
                   required
+                  disabled={isLoading}
                   className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -202,6 +210,7 @@ const SignUpPage: React.FC = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  disabled={isLoading}
                   placeholder="your.email@student.gmi.edu.my"
                   className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -215,19 +224,39 @@ const SignUpPage: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  disabled={isLoading}
                   className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
+              
+              {/* Error message */}
               {error && (
                 <div className="text-red-500 text-sm">{error}</div>
               )}
+
+              {/* Submit button with loading state */}
               <button
                 type="submit"
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                disabled={isLoading}
+                className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md text-sm font-medium text-white ${
+                  isLoading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
               >
-                Create Account
+                {isLoading ? (
+                  <div className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Creating Account...
+                  </div>
+                ) : (
+                  'Create Account'
+                )}
               </button>
             </form>
+
+            {/* Sign in link */}
             <p className="text-center mt-4 text-sm text-gray-600">
               Already have an account? <Link href="/signin" legacyBehavior>
                 <a className="font-medium text-blue-600 hover:text-blue-500">Login</a>
@@ -239,15 +268,21 @@ const SignUpPage: React.FC = () => {
 
       {/* Success Modal */}
       <AlertDialog open={isSuccessModalOpen} onOpenChange={setIsSuccessModalOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Registration Successful!</AlertDialogTitle>
-            <AlertDialogDescription>
-              Your account has been created successfully. Please check your email to confirm your account.
+        <div className="fixed inset-0 bg-black/70 z-40" /> {/* Dark backdrop overlay */}
+        <AlertDialogContent className="fixed z-50 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-md rounded-lg bg-white p-6 shadow-xl">
+          <AlertDialogHeader className="space-y-2">
+            <AlertDialogTitle className="text-xl font-bold text-gray-900">
+              Registration Successful! 🎉
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-600 text-base">
+              Your account has been created successfully. You will be redirected to the sign-in page in a few seconds...
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => router.push('/signin')}>
+          <AlertDialogFooter className="mt-6">
+            <AlertDialogAction 
+              onClick={() => router.push('/signin')}
+              className="inline-flex justify-center w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
+            >
               Go to Sign In
             </AlertDialogAction>
           </AlertDialogFooter>

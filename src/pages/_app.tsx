@@ -2,6 +2,7 @@ import type { AppProps } from 'next/app';
 import Head from 'next/head';
 import { Analytics } from '@vercel/analytics/react';
 import '../styles/globals.css';
+import { Toaster } from '@/ui/toaster';
 
 function MyApp({ Component, pageProps }: AppProps) {
   return (
@@ -13,6 +14,7 @@ function MyApp({ Component, pageProps }: AppProps) {
         <meta name="theme-color" content="#0066FF" />
       </Head>
       <Component {...pageProps} />
+      <Toaster />
       <Analytics 
         mode={'production'} // Change to 'development' when testing locally
         debug={false} // Set to true to see debug messages in console

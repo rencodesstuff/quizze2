@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { DndContext, useDraggable, useDroppable, DragEndEvent, closestCenter, PointerSensor, useSensors, useSensor } from '@dnd-kit/core';
+import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
 import Image from 'next/image';
-
 // Core interfaces and types
 interface QuestionProps {
   question: {
@@ -113,157 +113,143 @@ const QuestionExplanation: React.FC<{ explanation: string }> = ({ explanation })
   );
 };
 
-// New Drag and Drop Components
-const AnswerCard: React.FC<{ id: string; text: string }> = ({ id, text }) => {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: text
-  });
-
-  const style = transform ? {
-    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-    zIndex: isDragging ? 1000 : 1,
-    opacity: isDragging ? 0.8 : 1,
-  } : undefined;
-
-  return (
-    <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      style={style}
-      className="cursor-grab rounded-lg bg-blue-100 p-3 shadow-sm hover:shadow-md border border-blue-200 
-                 text-blue-800 select-none touch-none transition-shadow"
-    >
-      {text}
-    </div>
-  );
-};
-
-const DropSlot: React.FC<{ index: number; value: string }> = ({ index, value }) => {
-  const { isOver, setNodeRef } = useDroppable({
-    id: `blank-${index}`,
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={`
-        inline-flex min-w-[120px] h-10 mx-2 items-center justify-center 
-        rounded-md px-3 border-2 border-dashed transition-colors duration-200
-        ${isOver ? 'bg-blue-100 border-blue-400' : 
-          value ? 'bg-blue-50 border-blue-300' : 'bg-gray-50 border-gray-300'}
-      `}
-    >
-      {value ? (
-        <span className="text-blue-800 font-medium">{value}</span>
-      ) : (
-        <span className="text-gray-400">Drop answer here</span>
-      )}
-    </div>
-  );
-};
-
-// Question Type Components
 export const DragDrop: React.FC<QuestionProps> = ({
   question,
   answers,
   handleAnswer,
   showExplanation
 }) => {
-  const [currentAnswers, setCurrentAnswers] = useState<string[]>([]);
-  
-  useEffect(() => {
+  // Get initial answers from existing answers or create new array
+  const initialAnswers = useMemo(() => {
     const blankCount = (question.text.match(/\[answer\]/g) || []).length;
-    const initialAnswers = new Array(blankCount).fill('');
-    setCurrentAnswers(initialAnswers);
-    handleAnswer(question.id, initialAnswers);
-  }, [question.id, question.text, handleAnswer]);
+    if (answers[question.id] && Array.isArray(answers[question.id])) {
+      return answers[question.id] as string[];
+    }
+    return new Array(blankCount).fill('') as string[];
+  }, [question.id, question.text, answers]);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
-    })
-  );
+  // Single useState for all answers
+  const [localAnswers, setLocalAnswers] = useState<string[]>(initialAnswers);
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-
-    const draggedAnswer = active.id as string;
-    const targetId = over.id as string;
-
-    if (targetId.startsWith('blank-')) {
-      const blankIndex = parseInt(targetId.split('-')[1], 10);
-      const newAnswers = [...currentAnswers];
-      
-      // Remove answer from previous position if it exists
-      const oldIndex = newAnswers.findIndex(a => a === draggedAnswer);
+  // Handle actual drop
+  const onDrop = useCallback((index: number, droppedAnswer: string) => {
+    setLocalAnswers((prev: string[]) => {
+      const newAnswers = [...prev];
+      // Remove from old position
+      const oldIndex = newAnswers.findIndex(a => a === droppedAnswer);
       if (oldIndex !== -1) {
         newAnswers[oldIndex] = '';
       }
-
-      // Place answer in new position
-      newAnswers[blankIndex] = draggedAnswer;
-      
-      setCurrentAnswers(newAnswers);
+      // Add to new position
+      newAnswers[index] = droppedAnswer;
       handleAnswer(question.id, newAnswers);
-    }
-  };
+      return newAnswers;
+    });
+  }, [question.id, handleAnswer]);
 
+  // Available answers computation
   const availableAnswers = useMemo(() => {
-    const answers = question.drag_drop_answers || [];
-    return answers.filter(answer => !currentAnswers.includes(answer));
-  }, [question.drag_drop_answers, currentAnswers]);
+    const allAnswers = question.drag_drop_answers || [];
+    return allAnswers.filter(answer => !localAnswers.includes(answer));
+  }, [question.drag_drop_answers, localAnswers]);
+
+  // Draggable answer component
+  const DraggableAnswer: React.FC<{ answer: string }> = ({ answer }) => (
+    <div
+      draggable
+      onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
+        e.dataTransfer.setData('text/plain', answer);
+      }}
+      className="px-4 py-2 rounded-lg border-2 bg-white border-blue-200 
+                 hover:border-blue-300 cursor-grab text-blue-800 font-medium 
+                 select-none active:cursor-grabbing"
+    >
+      {answer}
+    </div>
+  );
+
+  // Drop zone component
+  const DropZone: React.FC<{ index: number; value: string }> = ({ index, value }) => {
+    const [isOver, setIsOver] = useState<boolean>(false);
+
+    return (
+      <div
+        onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
+          e.preventDefault();
+          if (!isOver) setIsOver(true);
+        }}
+        onDragLeave={(e: React.DragEvent<HTMLDivElement>) => {
+          e.preventDefault();
+          setIsOver(false);
+        }}
+        onDrop={(e: React.DragEvent<HTMLDivElement>) => {
+          e.preventDefault();
+          setIsOver(false);
+          const answer = e.dataTransfer.getData('text/plain');
+          if (answer) {
+            onDrop(index, answer);
+          }
+        }}
+        className={`
+          inline-flex min-w-[120px] h-10 mx-2 items-center justify-center
+          rounded-lg border-2 border-dashed p-2
+          ${isOver 
+            ? 'bg-blue-100 border-blue-500' 
+            : value 
+              ? 'bg-blue-50 border-blue-300' 
+              : 'bg-gray-50 border-gray-300'}
+          transition-colors duration-200
+        `}
+      >
+        {value ? (
+          <span className="text-blue-800 font-medium">{value}</span>
+        ) : (
+          <span className="text-gray-400">Drop here</span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
-      {question.image_url && (
-        <QuestionImage imageUrl={question.image_url} />
-      )}
+      {question.image_url && <QuestionImage imageUrl={question.image_url} />}
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="space-y-8">
-          {/* Question text with drop zones */}
-          <div className="text-lg text-gray-700 bg-white p-6 rounded-lg border border-gray-200 leading-relaxed">
-            {question.text.split('[answer]').map((segment, index, array) => (
-              <React.Fragment key={index}>
-                {segment}
-                {index < array.length - 1 && (
-                  <DropSlot index={index} value={currentAnswers[index]} />
-                )}
-              </React.Fragment>
-            ))}
-          </div>
-
-          {/* Available answers */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-4">
-              Available Answers:
-            </h3>
-            <div className="flex flex-wrap gap-3">
-              {availableAnswers.map((answer) => (
-                <div key={answer}>
-                  <AnswerCard id={answer} text={answer} />
-                </div>
-              ))}
-              {availableAnswers.length === 0 && (
-                <p className="text-sm text-gray-500 italic">
-                  All answers have been placed
-                </p>
+      <div className="space-y-8">
+        {/* Question text with drop zones */}
+        <div className="text-lg text-gray-700 bg-white p-6 rounded-lg border border-gray-200 leading-relaxed">
+          {question.text.split('[answer]').map((segment, index, array) => (
+            <React.Fragment key={index}>
+              {segment}
+              {index < array.length - 1 && (
+                <DropZone index={index} value={localAnswers[index]} />
               )}
-            </div>
+            </React.Fragment>
+          ))}
+        </div>
+
+        {/* Available answers */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 className="text-sm font-medium text-gray-700 mb-4">
+            Available Answers:
+          </h3>
+          <div className="flex flex-wrap gap-3">
+            {availableAnswers.map((answer) => (
+              <DraggableAnswer key={answer} answer={answer} />
+            ))}
+            {availableAnswers.length === 0 && (
+              <p className="text-sm text-gray-500 italic">
+                All answers have been placed
+              </p>
+            )}
           </div>
         </div>
-      </DndContext>
+      </div>
 
       {showExplanation && <QuestionExplanation explanation={question.explanation || ''} />}
     </div>
   );
 };
+
 
 export const MultipleChoice: React.FC<QuestionProps> = ({
   question,
@@ -431,180 +417,180 @@ export const MultipleSelection: React.FC<QuestionProps> = ({
             />
             <span className="text-gray-700">{option}</span>
           </label>
-          ))}
-          </div>
-    
-          {showExplanation && <QuestionExplanation explanation={question.explanation || ''} />}
-        </div>
-      );
-    };
-    
-    // Types and Utilities
-    export type QuestionType =
-      | "multiple-choice"
-      | "true-false"
-      | "short-answer"
-      | "multiple-selection"
-      | "drag-drop";
-    
-    export const QuestionTypes: Record<QuestionType, string> = {
-      "multiple-choice": "Multiple Choice",
-      "true-false": "True/False",
-      "short-answer": "Short Answer",
-      "multiple-selection": "Multiple Selection",
-      "drag-drop": "Drag and Drop",
-    };
-    
-    export const isAnswerComplete = (
-      questionType: QuestionType,
-      answer: any
-    ): boolean => {
-      if (!answer) return false;
-    
-      switch (questionType) {
-        case "multiple-choice":
-        case "true-false":
-        case "short-answer":
-          return typeof answer === "string" && answer.trim() !== "";
-    
-        case "multiple-selection":
-        case "drag-drop":
-          try {
-            const answers = typeof answer === "string" ? JSON.parse(answer) : answer;
-            if (!Array.isArray(answers)) return false;
-            if (questionType === "drag-drop") {
-              return answers.length > 0 && !answers.includes("");
-            }
-            return answers.length > 0;
-          } catch {
-            return false;
-          }
-    
-        default:
-          return false;
-      }
-    };
-    
-    export const formatAnswer = (
-      questionType: QuestionType,
-      answer: any
-    ): string => {
+        ))}
+      </div>
+
+      {showExplanation && <QuestionExplanation explanation={question.explanation || ''} />}
+    </div>
+  );
+};
+
+// Types and Utilities
+export type QuestionType =
+  | "multiple-choice"
+  | "true-false"
+  | "short-answer"
+  | "multiple-selection"
+  | "drag-drop";
+
+export const QuestionTypes: Record<QuestionType, string> = {
+  "multiple-choice": "Multiple Choice",
+  "true-false": "True/False",
+  "short-answer": "Short Answer",
+  "multiple-selection": "Multiple Selection",
+  "drag-drop": "Drag and Drop",
+};
+
+export const isAnswerComplete = (
+  questionType: QuestionType,
+  answer: any
+): boolean => {
+  if (!answer) return false;
+
+  switch (questionType) {
+    case "multiple-choice":
+    case "true-false":
+    case "short-answer":
+      return typeof answer === "string" && answer.trim() !== "";
+
+    case "multiple-selection":
+    case "drag-drop":
       try {
-        switch (questionType) {
-          case "multiple-choice":
-          case "true-false":
-          case "short-answer":
-            return String(answer);
-    
-          case "multiple-selection":
-            const selections = typeof answer === "string" ? JSON.parse(answer) : answer;
-            return Array.isArray(selections) ? selections.join(", ") : String(answer);
-    
-          case "drag-drop":
-            const answers = typeof answer === "string" ? JSON.parse(answer) : answer;
-            return Array.isArray(answers) ? answers.join(" → ") : String(answer);
-    
-          default:
-            return String(answer);
+        const answers = typeof answer === "string" ? JSON.parse(answer) : answer;
+        if (!Array.isArray(answers)) return false;
+        if (questionType === "drag-drop") {
+          return answers.length > 0 && !answers.includes("");
         }
-      } catch (e) {
-        console.error("Error formatting answer:", e);
+        return answers.length > 0;
+      } catch {
+        return false;
+      }
+
+    default:
+      return false;
+  }
+};
+
+export const formatAnswer = (
+  questionType: QuestionType,
+  answer: any
+): string => {
+  try {
+    switch (questionType) {
+      case "multiple-choice":
+      case "true-false":
+      case "short-answer":
         return String(answer);
-      }
-    };
-    
-    // Helper to validate drag-drop answers
-    export const validateDragDropAnswer = (
-      userAnswers: string[],
-      correctAnswers: string[]
-    ): boolean => {
-      if (!Array.isArray(userAnswers) || !Array.isArray(correctAnswers)) return false;
-      if (userAnswers.length !== correctAnswers.length) return false;
-    
-      return userAnswers.every(
-        (answer, index) => answer.toLowerCase() === correctAnswers[index].toLowerCase()
-      );
-    };
-    
-    // Custom hook for handling drag-drop state
-    export const useDragDropState = (
-      initialAnswers: string[] = [],
-      onChange?: (answers: string[]) => void
-    ) => {
-      const [answers, setAnswers] = useState<string[]>(initialAnswers);
-    
-      const handleDragEnd = useCallback((event: DragEndEvent) => {
-        const { active, over } = event;
-    
-        if (!over || active.id === over.id) return;
-    
-        try {
-          const oldIndex = answers.findIndex((answer) => answer === active.id);
-          const newIndex = answers.findIndex((answer) => answer === over.id);
-    
-          if (oldIndex === -1 || newIndex === -1) return;
-    
-          const newAnswers = Array.from(answers);
-          const [movedItem] = newAnswers.splice(oldIndex, 1);
-          newAnswers.splice(newIndex, 0, movedItem);
-    
-          setAnswers(newAnswers);
-          onChange?.(newAnswers);
-        } catch (error) {
-          console.error("Error in drag and drop:", error);
-        }
-      }, [answers, onChange]);
-    
-      return {
-        answers,
-        setAnswers,
-        handleDragEnd,
-      };
-    };
-    
-    // Utility function to prepare drag-drop question data
-    export const prepareDragDropQuestion = (
-      text: string,
-      answers: string[]
-    ): { dragDropText: string[]; dragDropAnswers: string[] } => {
-      const segments = text.split("[blank]");
-      return {
-        dragDropText: segments,
-        dragDropAnswers: answers,
-      };
-    };
-    
-    // Utility function to shuffle answers for drag-drop questions
-    export const shuffleAnswers = (answers: string[]): string[] => {
-      const shuffled = [...answers];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-      }
-      return shuffled;
-    };
-    
-    // Create a named object for all exports
-    const QuestionTypeComponents = {
-      MultipleChoice,
-      TrueFalse,
-      ShortAnswer,
-      MultipleSelection,
-      DragDrop,
-      QuestionTypes,
-      isAnswerComplete,
-      formatAnswer,
-      validateDragDropAnswer,
-      useDragDropState,
-      prepareDragDropQuestion,
-      shuffleAnswers,
-      isValidImageUrl,
-      preloadImage,
-      useImageLoader,
-    };
-    
-    // Export individual components and types
-    export type { QuestionProps };
-    
-    // Default export
-    export default QuestionTypeComponents;
+
+      case "multiple-selection":
+        const selections = typeof answer === "string" ? JSON.parse(answer) : answer;
+        return Array.isArray(selections) ? selections.join(", ") : String(answer);
+
+      case "drag-drop":
+        const answers = typeof answer === "string" ? JSON.parse(answer) : answer;
+        return Array.isArray(answers) ? answers.join(" → ") : String(answer);
+
+      default:
+        return String(answer);
+    }
+  } catch (e) {
+    console.error("Error formatting answer:", e);
+    return String(answer);
+  }
+};
+
+// Helper to validate drag-drop answers
+export const validateDragDropAnswer = (
+  userAnswers: string[],
+  correctAnswers: string[]
+): boolean => {
+  if (!Array.isArray(userAnswers) || !Array.isArray(correctAnswers)) return false;
+  if (userAnswers.length !== correctAnswers.length) return false;
+
+  return userAnswers.every(
+    (answer, index) => answer.toLowerCase() === correctAnswers[index].toLowerCase()
+  );
+};
+
+// Custom hook for handling drag-drop state
+export const useDragDropState = (
+  initialAnswers: string[] = [],
+  onChange?: (answers: string[]) => void
+) => {
+  const [answers, setAnswers] = useState<string[]>(initialAnswers);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    try {
+      const oldIndex = answers.findIndex((answer) => answer === active.id);
+      const newIndex = answers.findIndex((answer) => answer === over.id);
+
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const newAnswers = Array.from(answers);
+      const [movedItem] = newAnswers.splice(oldIndex, 1);
+      newAnswers.splice(newIndex, 0, movedItem);
+
+      setAnswers(newAnswers);
+      onChange?.(newAnswers);
+    } catch (error) {
+      console.error("Error in drag and drop:", error);
+    }
+  }, [answers, onChange]);
+
+  return {
+    answers,
+    setAnswers,
+    handleDragEnd,
+  };
+};
+
+// Utility function to prepare drag-drop question data
+export const prepareDragDropQuestion = (
+  text: string,
+  answers: string[]
+): { dragDropText: string[]; dragDropAnswers: string[] } => {
+  const segments = text.split("[blank]");
+  return {
+    dragDropText: segments,
+    dragDropAnswers: answers,
+  };
+};
+
+// Utility function to shuffle answers for drag-drop questions
+export const shuffleAnswers = (answers: string[]): string[] => {
+  const shuffled = [...answers];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
+// Create a named object for all exports
+const QuestionTypeComponents = {
+  MultipleChoice,
+  TrueFalse,
+  ShortAnswer,
+  MultipleSelection,
+  DragDrop,
+  QuestionTypes,
+  isAnswerComplete,
+  formatAnswer,
+  validateDragDropAnswer,
+  useDragDropState,
+  prepareDragDropQuestion,
+  shuffleAnswers,
+  isValidImageUrl,
+  preloadImage,
+  useImageLoader,
+};
+
+// Export individual components and types
+export type { QuestionProps };
+
+// Default export
+export default QuestionTypeComponents;

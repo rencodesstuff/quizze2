@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, memo } from "react";
 import { useRouter } from "next/router";
 import TeacherSidebar from "./teachsidebar";
 import TeacherNavbar from "./teacher-navbar";
@@ -10,12 +10,14 @@ interface TeacherLayoutProps {
   children: React.ReactNode;
 }
 
-const TeacherLayout: React.FC<TeacherLayoutProps> = ({ children }) => {
+const TeacherLayout: React.FC<TeacherLayoutProps> = memo(({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [teacherName, setTeacherName] = useState("");
-  const [teacherCourse, setTeacherCourse] = useState("");
-  const [profilePictureUrl, setProfilePictureUrl] = useState("/TeacherAvatar.png");
+  const [teacherInfo, setTeacherInfo] = useState({
+    name: "",
+    course: "",
+    profilePictureUrl: "/TeacherAvatar.png",
+  });
   const [isLoading, setIsLoading] = useState(true);
   const supabasecomp = createClientComp();
   const router = useRouter();
@@ -24,86 +26,104 @@ const TeacherLayout: React.FC<TeacherLayoutProps> = ({ children }) => {
 
   const activeItem = router.pathname.split('/')[1] || 'teachdash';
 
-  useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
-      if (!mobile) {
-        setIsSidebarOpen(false);
-      }
-    };
-
-    handleResize();
-    window.addEventListener("resize", handleResize);
-
-    const fetchTeacherInfo = async () => {
-      setIsLoading(true);
-      try {
-        console.log("Fetching user data...");
-        const { data: { user }, error: userError } = await supabasecomp.auth.getUser();
-        
-        if (userError) {
-          console.error("Error fetching user:", userError);
-          return;
-        }
-
-        if (user) {
-          console.log("Authenticated user:", user);
-          console.log("Fetching teacher data for user ID:", user.id);
-          const { data, error } = await supabasecomp
-            .from('teachers')
-            .select('name, course, profile_picture_url')
-            .eq('id', user.id)
-            .single();
-
-          if (error) {
-            console.error('Error fetching teacher info:', error);
-            return;
-          }
-
-          console.log("Fetched teacher data:", data);
-
-          if (data) {
-            setTeacherName(data.name || "");
-            setTeacherCourse(data.course || "");
-            if (data.profile_picture_url) {
-              setProfilePictureUrl(data.profile_picture_url);
-            }
-          } else {
-            console.warn("No teacher data found for user:", user.id);
-          }
-        } else {
-          console.warn("No authenticated user found");
-        }
-      } catch (error) {
-        console.error("Unexpected error:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchTeacherInfo();
-
-    return () => window.removeEventListener("resize", handleResize);
+  // Memoize the resize handler
+  const handleResize = useCallback(() => {
+    const mobile = window.innerWidth < 768;
+    setIsMobile(mobile);
+    if (!mobile) {
+      setIsSidebarOpen(false);
+    }
   }, []);
 
-  const handleLogout = async () => {
+  // Memoize the logout handler
+  const handleLogoutCallback = useCallback(async () => {
     const { error } = await supabasecomp.auth.signOut();
     if (error) {
-      console.log(error);
+      console.error("Logout error:", error);
     } else {
       router.push("/signin");
     }
-  };
+  }, [supabasecomp.auth, router]);
 
-  console.log("Rendering TeacherLayout:", { teacherName, teacherCourse, isLoading });
+  // Memoize the fetch teacher info function
+  const fetchTeacherInfo = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const { data: { user }, error: userError } = await supabasecomp.auth.getUser();
+      
+      if (userError) {
+        console.error("Error fetching user:", userError);
+        return;
+      }
+
+      if (user) {
+        const { data, error } = await supabasecomp
+          .from('teachers')
+          .select('name, course, profile_picture_url')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching teacher info:', error);
+          return;
+        }
+
+        if (data) {
+          setTeacherInfo({
+            name: data.name || "",
+            course: data.course || "",
+            profilePictureUrl: data.profile_picture_url || "/TeacherAvatar.png",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Unexpected error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [supabasecomp]);
+
+  // Handle initial setup and cleanup
+  useEffect(() => {
+    handleResize();
+    fetchTeacherInfo();
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [handleResize, fetchTeacherInfo]);
+
+  // Memoize the sidebar toggle handler
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen(prev => !prev);
+  }, []);
+
+  // Memoize the sidebar hover handlers
+  const handleSidebarEnter = useCallback(() => {
+    if (!isMobile) {
+      setIsSidebarOpen(true);
+    }
+  }, [isMobile]);
+
+  const handleSidebarLeave = useCallback(() => {
+    if (!isMobile) {
+      setIsSidebarOpen(false);
+    }
+  }, [isMobile]);
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log("Rendering TeacherLayout:", { 
+      teacherName: teacherInfo.name, 
+      teacherCourse: teacherInfo.course, 
+      isLoading 
+    });
+  }
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
       {isMobile && (
         <button
           className="fixed top-4 left-4 z-50 bg-white p-2 rounded-md shadow-md"
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          onClick={toggleSidebar}
         >
           {isSidebarOpen ? (
             <XIcon className="w-6 h-6" />
@@ -121,23 +141,23 @@ const TeacherLayout: React.FC<TeacherLayoutProps> = ({ children }) => {
               : "hidden"
             : "relative"
         } md:block transition-all duration-300 ease-in-out`}
-        onMouseEnter={() => !isMobile && setIsSidebarOpen(true)}
-        onMouseLeave={() => !isMobile && setIsSidebarOpen(false)}
+        onMouseEnter={handleSidebarEnter}
+        onMouseLeave={handleSidebarLeave}
       >
         <TeacherSidebar
           isOpen={isSidebarOpen}
           isMobile={isMobile}
           activeItem={activeItem}
-          onLogout={handleLogout}
+          onLogout={handleLogoutCallback}
         />
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden pl-4 pr-4 pt-4">
         <div className="mb-4">
           <TeacherNavbar 
-            teacherName={teacherName} 
-            teacherCourse={teacherCourse} 
-            profilePictureUrl={profilePictureUrl}
+            teacherName={teacherInfo.name} 
+            teacherCourse={teacherInfo.course} 
+            profilePictureUrl={teacherInfo.profilePictureUrl}
             isLoading={isLoading}
           />
         </div>
@@ -147,6 +167,8 @@ const TeacherLayout: React.FC<TeacherLayoutProps> = ({ children }) => {
       </div>
     </div>
   );
-};
+});
+
+TeacherLayout.displayName = 'TeacherLayout';
 
 export default TeacherLayout;

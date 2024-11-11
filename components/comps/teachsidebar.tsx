@@ -1,4 +1,3 @@
-// components/TeacherSidebar.tsx
 import React from "react";
 import Link from "next/link";
 import {
@@ -9,6 +8,7 @@ import {
   UserIcon,
   CogIcon,
   LogoutIcon,
+  BookOpenIcon, // Added for Question Bank
 } from "@heroicons/react/outline";
 
 interface TeacherSidebarProps {
@@ -21,11 +21,13 @@ interface TeacherSidebarProps {
 const sidebarItems = [
   { name: "Dashboard", href: "/teachdash", icon: HomeIcon },
   { name: "Create Quiz", href: "/createquiz", icon: PlusCircleIcon },
+  { name: "Question Bank", href: "/questionbank", icon: BookOpenIcon }, // Added new item
   { name: "My Quizzes", href: "/teachquiz", icon: ClipboardListIcon },
   { name: "Student Scores", href: "/stdscores", icon: UserGroupIcon },
   { name: "Profile", href: "/teachprofile", icon: UserIcon },
   { name: "Settings", href: "/teachsettings", icon: CogIcon },
 ];
+
 
 const TeacherSidebar: React.FC<TeacherSidebarProps> = ({
   isOpen,

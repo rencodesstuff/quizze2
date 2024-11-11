@@ -1,6 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  transpilePackages: [
+    '@radix-ui/react-select',
+    '@radix-ui/react-dialog',
+    '@radix-ui/react-dropdown-menu',
+    '@radix-ui/react-toast',
+    '@radix-ui/react-popover',
+    '@radix-ui/react-checkbox',
+  ],
   images: {
     domains: ['localhost'],
     remotePatterns: [
