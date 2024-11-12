@@ -1,37 +1,59 @@
 // utils/question-bank.ts
+
 import { createClient } from './supabase/component';
 import { 
-  QuestionBankItem, 
-  QuestionBankFilters, 
-  FetchQuestionsResponse,
-  CreateQuestionBankItem
+  CreateQuestionBankItem, 
+  QuestionBankItem,
+  QuestionType,
+  DifficultyLevel
 } from '../types/question-bank';
-import { PostgrestError } from '@supabase/supabase-js';
 
-const PAGE_SIZE = 20;
+export interface QuestionBankFilters {
+  searchTerm?: string;
+  types?: QuestionType[];
+  difficulty?: DifficultyLevel | null;
+  category?: string | null;
+  subcategory?: string | null;
+  tags?: string[];
+  dateRange?: {
+    from: Date | null;
+    to: Date | null;
+  };
+  sort?: 'newest' | 'oldest' | 'difficulty' | 'alphabetical';
+  favorites?: boolean;
+}
+
+// Initialize default stats objects
+const initializeTypeStats = (): Record<QuestionType, number> => ({
+  'multiple-choice': 0,
+  'true-false': 0,
+  'short-answer': 0,
+  'multiple-selection': 0,
+  'drag-drop': 0
+});
+
+const initializeDifficultyStats = (): Record<DifficultyLevel, number> => ({
+  'Easy': 0,
+  'Medium': 0,
+  'Hard': 0
+});
 
 export const questionBankService = {
-  async fetchQuestions(
-    page: number,
-    filters: QuestionBankFilters
-  ): Promise<FetchQuestionsResponse> {
+  fetchQuestions: async (
+    page: number = 0,
+    filters: QuestionBankFilters = {},
+    pageSize: number = 20
+  ): Promise<{ questions: QuestionBankItem[]; hasMore: boolean }> => {
     const supabase = createClient();
-    const start = page * PAGE_SIZE;
-    const end = start + PAGE_SIZE - 1;
-
     let query = supabase
       .from('question_bank')
-      .select('*', { count: 'exact' })
-      .eq('is_active', true);
+      .select('*', { count: 'exact' });
 
-    // Apply filters
     if (filters.searchTerm) {
-      query = query.or(
-        `question_text.ilike.%${filters.searchTerm}%,subject.ilike.%${filters.searchTerm}%,topic.ilike.%${filters.searchTerm}%`
-      );
+      query = query.or(`question_text.ilike.%${filters.searchTerm}%,explanation.ilike.%${filters.searchTerm}%`);
     }
 
-    if (filters.types.length > 0) {
+    if (filters.types && filters.types.length > 0) {
       query = query.in('type', filters.types);
     }
 
@@ -39,29 +61,30 @@ export const questionBankService = {
       query = query.eq('difficulty', filters.difficulty);
     }
 
-    if (filters.subject) {
-      query = query.eq('subject', filters.subject);
+    if (filters.category) {
+      query = query.eq('category', filters.category);
     }
 
-    if (filters.topic) {
-      query = query.eq('topic', filters.topic);
+    if (filters.subcategory) {
+      query = query.eq('subcategory', filters.subcategory);
     }
 
-    if (filters.tags.length > 0) {
+    if (filters.tags && filters.tags.length > 0) {
       query = query.contains('tags', filters.tags);
     }
 
-    if (filters.dateRange.from && filters.dateRange.to) {
-      query = query
-        .gte('created_at', filters.dateRange.from.toISOString())
-        .lte('created_at', filters.dateRange.to.toISOString());
+    if (filters.dateRange?.from) {
+      query = query.gte('created_at', filters.dateRange.from.toISOString());
+    }
+
+    if (filters.dateRange?.to) {
+      query = query.lte('created_at', filters.dateRange.to.toISOString());
     }
 
     if (filters.favorites) {
       query = query.eq('is_favorite', true);
     }
 
-    // Apply sorting
     switch (filters.sort) {
       case 'newest':
         query = query.order('created_at', { ascending: false });
@@ -69,48 +92,66 @@ export const questionBankService = {
       case 'oldest':
         query = query.order('created_at', { ascending: true });
         break;
-      case 'difficulty-asc':
+      case 'difficulty':
         query = query.order('difficulty', { ascending: true });
         break;
-      case 'difficulty-desc':
-        query = query.order('difficulty', { ascending: false });
+      case 'alphabetical':
+        query = query.order('question_text', { ascending: true });
         break;
-      case 'type':
-        query = query.order('type', { ascending: true });
-        break;
+      default:
+        query = query.order('created_at', { ascending: false });
     }
 
-    query = query.range(start, end);
+    const start = page * pageSize;
+    query = query.range(start, start + pageSize - 1);
 
     const { data, error, count } = await query;
 
-    if (error) throw error;
+    if (error) {
+      throw new Error(`Error fetching questions: ${error.message}`);
+    }
 
     return {
       questions: data as QuestionBankItem[],
-      totalCount: count || 0,
-      hasMore: count ? start + PAGE_SIZE < count : false
+      hasMore: count ? start + pageSize < count : false
     };
   },
 
-  async addQuestion(questionData: CreateQuestionBankItem): Promise<QuestionBankItem> {
+  addQuestion: async (question: CreateQuestionBankItem): Promise<QuestionBankItem> => {
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) throw new Error('User not authenticated');
-
+    
     const { data, error } = await supabase
       .from('question_bank')
-      .insert([{ ...questionData, teacher_id: user.id }])
+      .insert({
+        question_text: question.question_text,
+        type: question.type,
+        difficulty: question.difficulty,
+        category: question.category,
+        subcategory: question.subcategory,
+        correct_answer: question.correct_answer,
+        options: question.options,
+        explanation: question.explanation,
+        image_url: question.image_url,
+        multiple_correct_answers: question.multiple_correct_answers,
+        drag_drop_text: question.drag_drop_text,
+        drag_drop_answers: question.drag_drop_answers,
+      })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw new Error(`Error adding question: ${error.message}`);
+    }
+
     return data;
   },
 
-  async updateQuestion(id: string, updates: Partial<QuestionBankItem>): Promise<QuestionBankItem> {
+  updateQuestion: async (
+    id: string,
+    updates: Partial<CreateQuestionBankItem>
+  ): Promise<QuestionBankItem> => {
     const supabase = createClient();
+    
     const { data, error } = await supabase
       .from('question_bank')
       .update(updates)
@@ -118,95 +159,181 @@ export const questionBankService = {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      throw new Error(`Error updating question: ${error.message}`);
+    }
+
     return data;
   },
 
-  async deleteQuestions(ids: string[]): Promise<void> {
+  deleteQuestions: async (ids: string[]): Promise<void> => {
     const supabase = createClient();
+    
     const { error } = await supabase
       .from('question_bank')
       .delete()
       .in('id', ids);
 
-    if (error) throw error;
+    if (error) {
+      throw new Error(`Error deleting questions: ${error.message}`);
+    }
   },
 
-  async toggleFavorite(id: string, isFavorite: boolean): Promise<QuestionBankItem> {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from('question_bank')
-      .update({ is_favorite: isFavorite })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-  async updateTags(id: string, tags: string[]): Promise<QuestionBankItem> {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from('question_bank')
-      .update({ tags })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-  async bulkUpdateTags(
-    ids: string[], 
-    tags: string[], 
-    operation: 'add' | 'remove' | 'set'
-  ): Promise<void> {
+  getQuestionById: async (id: string): Promise<QuestionBankItem> => {
     const supabase = createClient();
     
-    if (operation === 'set') {
-      const { error } = await supabase
-        .from('question_bank')
-        .update({ tags })
-        .in('id', ids);
+    const { data, error } = await supabase
+      .from('question_bank')
+      .select()
+      .eq('id', id)
+      .single();
 
-      if (error) throw error;
-      return;
+    if (error) {
+      throw new Error(`Error fetching question: ${error.message}`);
     }
 
+    return data;
+  },
+
+  toggleFavorite: async (id: string, isFavorite: boolean): Promise<void> => {
+    const supabase = createClient();
+    
+    const { error } = await supabase
+      .from('question_bank')
+      .update({ is_favorite: isFavorite })
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(`Error updating favorite status: ${error.message}`);
+    }
+  },
+
+  bulkUpdateTags: async (
+    ids: string[],
+    tags: string[],
+    operation: 'add' | 'remove' | 'set'
+  ): Promise<void> => {
+    const supabase = createClient();
+    
     const { data: questions, error: fetchError } = await supabase
       .from('question_bank')
       .select('id, tags')
       .in('id', ids);
 
-    if (fetchError) throw fetchError;
+    if (fetchError) {
+      throw new Error(`Error fetching questions for tag update: ${fetchError.message}`);
+    }
 
-    const updates = questions.map((question: { id: string; tags: string[] }) => ({
-      id: question.id,
-      tags: operation === 'add'
-        ? [...new Set([...(question.tags || []), ...tags])]
-        : (question.tags || []).filter(tag => !tags.includes(tag))
-    }));
+    const updates = questions.map((question: { id: string; tags: string[] }) => {
+      let newTags: string[];
+      switch (operation) {
+        case 'add':
+          newTags = [...new Set([...(question.tags || []), ...tags])];
+          break;
+        case 'remove':
+          newTags = (question.tags || []).filter((tag: string) => !tags.includes(tag));
+          break;
+        case 'set':
+          newTags = tags;
+          break;
+      }
 
-    const { error: updateError } = await supabase
-      .from('question_bank')
-      .upsert(updates);
+      return {
+        id: question.id,
+        tags: newTags
+      };
+    });
 
-    if (updateError) throw updateError;
-  },
+    for (const update of updates) {
+      const { error } = await supabase
+        .from('question_bank')
+        .update({ tags: update.tags })
+        .eq('id', update.id);
 
-  formatError(error: PostgrestError | Error): string {
-    if ('code' in error) {
-      switch (error.code) {
-        case '23505':
-          return 'A question with these details already exists.';
-        case '23503':
-          return 'Referenced record does not exist.';
-        default:
-          return error.message;
+      if (error) {
+        throw new Error(`Error updating tags: ${error.message}`);
       }
     }
-    return error.message;
+  },
+
+  getCategories: async (): Promise<string[]> => {
+    const supabase = createClient();
+    
+    const { data, error } = await supabase
+      .from('question_bank')
+      .select('category')
+      .then(result => ({
+        data: Array.from(new Set(result.data?.map(item => item.category))),
+        error: result.error
+      }));
+
+    if (error) {
+      throw new Error(`Error fetching categories: ${error.message}`);
+    }
+
+    return data || [];
+  },
+
+  getSubcategories: async (category: string): Promise<string[]> => {
+    const supabase = createClient();
+    
+    const { data, error } = await supabase
+      .from('question_bank')
+      .select('subcategory')
+      .eq('category', category)
+      .then(result => ({
+        data: Array.from(new Set(result.data?.map(item => item.subcategory))),
+        error: result.error
+      }));
+
+    if (error) {
+      throw new Error(`Error fetching subcategories: ${error.message}`);
+    }
+
+    return data || [];
+  },
+
+  getStatistics: async (): Promise<{
+    total: number;
+    byType: Record<QuestionType, number>;
+    byDifficulty: Record<DifficultyLevel, number>;
+    byCategory: Record<string, number>;
+  }> => {
+    const supabase = createClient();
+    
+    const [
+      countResult,
+      typeResult,
+      difficultyResult,
+      categoryResult
+    ] = await Promise.all([
+      supabase.from('question_bank').select('*', { count: 'exact', head: true }),
+      supabase.from('question_bank').select('type'),
+      supabase.from('question_bank').select('difficulty'),
+      supabase.from('question_bank').select('category')
+    ]);
+
+    const typeStats = initializeTypeStats();
+    const difficultyStats = initializeDifficultyStats();
+    const categoryStats: Record<string, number> = {};
+
+    typeResult.data?.forEach((item: { type: QuestionType }) => {
+      typeStats[item.type] = (typeStats[item.type] || 0) + 1;
+    });
+
+    difficultyResult.data?.forEach((item: { difficulty: DifficultyLevel }) => {
+      difficultyStats[item.difficulty] = (difficultyStats[item.difficulty] || 0) + 1;
+    });
+
+    categoryResult.data?.forEach((item: { category: string }) => {
+      categoryStats[item.category] = (categoryStats[item.category] || 0) + 1;
+    });
+
+    return {
+      total: countResult.count || 0,
+      byType: typeStats,
+      byDifficulty: difficultyStats,
+      byCategory: categoryStats
+    };
   }
 };

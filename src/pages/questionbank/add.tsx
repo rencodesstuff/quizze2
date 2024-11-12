@@ -27,14 +27,108 @@ import { Alert, AlertDescription } from "@/ui/alert";
 import { ArrowLeftIcon } from "@heroicons/react/outline";
 import { getQuestionTypeComponent, ImageUploadComponent, Question } from "@/comps/questionform";
 
+// Define category types
+type Category = {
+  name: string;
+  subcategories: string[];
+};
+
+// Define available categories and their subcategories
+const QUESTION_CATEGORIES: Category[] = [
+  {
+    name: "Mathematics",
+    subcategories: [
+      "Algebra",
+      "Geometry",
+      "Calculus",
+      "Statistics",
+      "Trigonometry",
+      "Number Theory",
+      "Discrete Mathematics"
+    ]
+  },
+  {
+    name: "Science",
+    subcategories: [
+      "Physics",
+      "Chemistry",
+      "Biology",
+      "Earth Science",
+      "Astronomy",
+      "Environmental Science"
+    ]
+  },
+  {
+    name: "Languages",
+    subcategories: [
+      "Grammar",
+      "Literature",
+      "Composition",
+      "Vocabulary",
+      "Reading Comprehension"
+    ]
+  },
+  {
+    name: "Social Studies",
+    subcategories: [
+      "History",
+      "Geography",
+      "Economics",
+      "Political Science",
+      "Sociology",
+      "Psychology"
+    ]
+  },
+  {
+    name: "Arts",
+    subcategories: [
+      "Visual Arts",
+      "Music",
+      "Drama",
+      "Dance",
+      "Art History"
+    ]
+  },
+  {
+    name: "Physical Education",
+    subcategories: [
+      "Sports Rules",
+      "Health Education",
+      "Fitness",
+      "Nutrition",
+      "First Aid"
+    ]
+  },
+  {
+    name: "Technology",
+    subcategories: [
+      "Computer Science",
+      "Information Technology",
+      "Digital Literacy",
+      "Programming",
+      "Cybersecurity"
+    ]
+  },
+  {
+    name: "Business",
+    subcategories: [
+      "Management",
+      "Marketing",
+      "Accounting",
+      "Finance",
+      "Entrepreneurship"
+    ]
+  }
+];
+
 // Extend the base Question type with our additional fields
 interface ExtendedQuestionBankItem {
   question_text: string;
   text: string;
   type: QuestionType;
   difficulty: DifficultyLevel;
-  subject: string;
-  topic: string;
+  category: string;
+  subcategory: string;
   correct_answer: string;
   explanation: string;
   options: string[];
@@ -43,6 +137,72 @@ interface ExtendedQuestionBankItem {
   drag_drop_text?: string[];
   drag_drop_answers?: string[];
 }
+
+// Category Selection Component
+const CategorySelection = ({ 
+  currentQuestion, 
+  handleInputChange 
+}: { 
+  currentQuestion: ExtendedQuestionBankItem;
+  handleInputChange: (field: keyof ExtendedQuestionBankItem, value: any) => void;
+}) => {
+  const selectedCategory = QUESTION_CATEGORIES.find(cat => cat.name === currentQuestion.category);
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="space-y-2">
+        <Label>Category*</Label>
+        <Select
+          value={currentQuestion.category}
+          onValueChange={(value) => {
+            handleInputChange("category", value);
+            // Reset subcategory when category changes
+            handleInputChange("subcategory", "");
+          }}
+        >
+          <SelectTrigger className="w-full bg-white border-gray-200">
+            <SelectValue placeholder="Select category" />
+          </SelectTrigger>
+          <SelectContent className="bg-white">
+            {QUESTION_CATEGORIES.map((category) => (
+              <SelectItem
+                key={category.name}
+                value={category.name}
+                className="hover:bg-gray-100 cursor-pointer"
+              >
+                {category.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Subcategory*</Label>
+        <Select
+          value={currentQuestion.subcategory}
+          onValueChange={(value) => handleInputChange("subcategory", value)}
+          disabled={!currentQuestion.category}
+        >
+          <SelectTrigger className="w-full bg-white border-gray-200">
+            <SelectValue placeholder="Select subcategory" />
+          </SelectTrigger>
+          <SelectContent className="bg-white">
+            {selectedCategory?.subcategories.map((subcategory) => (
+              <SelectItem
+                key={subcategory}
+                value={subcategory}
+                className="hover:bg-gray-100 cursor-pointer"
+              >
+                {subcategory}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+};
 
 const AddQuestion = () => {
   const router = useRouter();
@@ -56,8 +216,8 @@ const AddQuestion = () => {
     text: "",
     type: "multiple-choice",
     difficulty: "Medium",
-    subject: "",
-    topic: "",
+    category: "",
+    subcategory: "",
     correct_answer: "",
     options: [],
     explanation: "",
@@ -147,7 +307,7 @@ const AddQuestion = () => {
     setLoading(true);
 
     try {
-      if (!currentQuestion.question_text || !currentQuestion.subject || !currentQuestion.topic) {
+      if (!currentQuestion.question_text || !currentQuestion.category || !currentQuestion.subcategory) {
         throw new Error("Please fill in all required fields");
       }
 
@@ -163,11 +323,15 @@ const AddQuestion = () => {
         question_text: currentQuestion.question_text,
         type: currentQuestion.type,
         difficulty: currentQuestion.difficulty,
-        subject: currentQuestion.subject,
-        topic: currentQuestion.topic,
+        category: currentQuestion.category,
+        subcategory: currentQuestion.subcategory,
         correct_answer: currentQuestion.correct_answer,
         options: currentQuestion.options,
         explanation: currentQuestion.explanation,
+        image_url: currentQuestion.image_url,
+        multiple_correct_answers: currentQuestion.multiple_correct_answers,
+        drag_drop_text: currentQuestion.drag_drop_text,
+        drag_drop_answers: currentQuestion.drag_drop_answers,
       };
 
       await questionBankService.addQuestion(submissionData);
@@ -241,31 +405,11 @@ const AddQuestion = () => {
                 {/* Dynamic Question Type Component */}
                 <QuestionTypeWrapper />
 
-                {/* Subject and Topic Fields */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label>Subject*</Label>
-                    <input
-                      type="text"
-                      placeholder="e.g., Mathematics"
-                      value={currentQuestion.subject}
-                      onChange={(e) => handleInputChange("subject", e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Topic*</Label>
-                    <input
-                      type="text"
-                      placeholder="e.g., Algebra"
-                      value={currentQuestion.topic}
-                      onChange={(e) => handleInputChange("topic", e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md"
-                      required
-                    />
-                  </div>
-                </div>
+                {/* Category Selection */}
+                <CategorySelection
+                  currentQuestion={currentQuestion}
+                  handleInputChange={handleInputChange}
+                />
 
                 {/* Difficulty Level */}
                 <div className="space-y-2">
