@@ -31,22 +31,24 @@ export interface QuestionBankItem extends CreateQuestionBankItem {
   teacher_id: string;
   created_at: string;
   is_active: boolean;
-  is_favorite: boolean;  // Added this field
+  is_favorite: boolean;
   tags: string[];
 }
 
 // Filter interface for the question bank
 export interface QuestionBankFilters {
-  searchTerm?: string;
-  types?: QuestionType[];
-  difficulty?: DifficultyLevel | null;
-  category?: string | null;
-  subcategory?: string | null;
-  tags?: string[];
-  dateRange?: {
-    from: Date | null;
-    to: Date | null;
-  };
-  sort?: 'newest' | 'oldest' | 'difficulty' | 'alphabetical';
-  favorites?: boolean;
+  searchTerm: string;
+  types: QuestionType[];
+  difficulty: DifficultyLevel | null;
+  category: string | null;
+  subcategory: string | null;
+  tags: string[];
+  dateRange: DateRange;
+  sort: 'newest' | 'oldest' | 'difficulty' | 'alphabetical';
+  favorites: boolean;
+}
+
+export interface DateRange {
+  from: Date | null;
+  to: Date | null;
 }

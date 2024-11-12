@@ -9,18 +9,18 @@ import {
 } from '../types/question-bank';
 
 export interface QuestionBankFilters {
-  searchTerm?: string;
-  types?: QuestionType[];
-  difficulty?: DifficultyLevel | null;
-  category?: string | null;
-  subcategory?: string | null;
-  tags?: string[];
-  dateRange?: {
+  searchTerm: string;
+  types: QuestionType[];
+  difficulty: DifficultyLevel | null;
+  category: string | null;
+  subcategory: string | null;
+  tags: string[];
+  dateRange: {
     from: Date | null;
     to: Date | null;
   };
-  sort?: 'newest' | 'oldest' | 'difficulty' | 'alphabetical';
-  favorites?: boolean;
+  sort: 'newest' | 'oldest' | 'difficulty' | 'alphabetical';
+  favorites: boolean;
 }
 
 // Initialize default stats objects
@@ -38,10 +38,25 @@ const initializeDifficultyStats = (): Record<DifficultyLevel, number> => ({
   'Hard': 0
 });
 
+export const defaultQuestionBankFilters: QuestionBankFilters = {
+  searchTerm: "",
+  types: [],
+  difficulty: null,
+  category: null,
+  subcategory: null,
+  tags: [],
+  dateRange: {
+    from: null,
+    to: null
+  },
+  sort: 'newest',
+  favorites: false
+};
+
 export const questionBankService = {
   fetchQuestions: async (
     page: number = 0,
-    filters: QuestionBankFilters = {},
+    filters: QuestionBankFilters = defaultQuestionBankFilters,
     pageSize: number = 20
   ): Promise<{ questions: QuestionBankItem[]; hasMore: boolean }> => {
     const supabase = createClient();

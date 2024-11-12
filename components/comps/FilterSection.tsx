@@ -1,6 +1,8 @@
 // components/FilterSection.tsx
 
 import React from 'react';
+import { cn } from "../../lib/utils";
+import { QuestionBankFilters, QuestionType, DifficultyLevel } from '../../types/question-bank';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +14,6 @@ import {
 import { Button } from "@/ui/button";
 import { Calendar } from "@/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
-import { cn } from "../../lib/utils";
 import { format } from "date-fns";
 import {
   Filter,
@@ -21,7 +22,6 @@ import {
   LayoutList,
   ChevronDown,
 } from "lucide-react";
-import { QuestionType, DifficultyLevel } from '../../types/question-bank';
 
 const QuestionTypes: QuestionType[] = [
   "multiple-choice",
@@ -34,8 +34,8 @@ const QuestionTypes: QuestionType[] = [
 const DifficultyLevels: DifficultyLevel[] = ["Easy", "Medium", "Hard"];
 
 interface FilterSectionProps {
-  filters: any;
-  onFilterChange: (key: string, value: any) => void;
+  filters: QuestionBankFilters;
+  onFilterChange: (key: keyof QuestionBankFilters, value: any) => void;
   viewMode: 'grid' | 'list';
   onViewModeChange: (mode: 'grid' | 'list') => void;
 }
@@ -71,7 +71,7 @@ export function FilterSection({
               onCheckedChange={(checked) => {
                 const newTypes = checked
                   ? [...filters.types, type]
-                  : filters.types.filter((t: string) => t !== type);
+                  : filters.types.filter((t) => t !== type);
                 onFilterChange('types', newTypes);
               }}
               className="hover:bg-gray-100"
@@ -91,7 +91,7 @@ export function FilterSection({
             variant="outline" 
             className="bg-white border-gray-200 hover:bg-gray-100"
           >
-            All Difficulties
+            {filters.difficulty || "All Difficulties"}
             <ChevronDown className="w-4 h-4 ml-2" />
           </Button>
         </DropdownMenuTrigger>
@@ -147,20 +147,22 @@ export function FilterSection({
           className="w-auto p-0 bg-white border border-gray-200 shadow-lg" 
           align="start"
         >
-          <Calendar
-            initialFocus
-            mode="range"
-            defaultMonth={filters.dateRange.from}
-            selected={{
-              from: filters.dateRange.from,
-              to: filters.dateRange.to,
-            }}
-            onSelect={(range) => onFilterChange('dateRange', {
-              from: range?.from || null,
-              to: range?.to || null,
-            })}
-            numberOfMonths={2}
-          />
+  <Calendar
+    initialFocus
+    mode="range"
+    defaultMonth={filters.dateRange.from || undefined}
+    selected={{
+      from: filters.dateRange.from || undefined,
+      to: filters.dateRange.to || undefined
+    }}
+    onSelect={(range: { from?: Date; to?: Date } | undefined) => {
+      onFilterChange('dateRange', {
+        from: range?.from || null,
+        to: range?.to || null,
+      });
+    }}
+    numberOfMonths={2}
+  />
         </PopoverContent>
       </Popover>
 
@@ -171,7 +173,10 @@ export function FilterSection({
             variant="outline" 
             className="bg-white border-gray-200 hover:bg-gray-100"
           >
-            Newest First
+            {filters.sort === 'newest' && "Newest First"}
+            {filters.sort === 'oldest' && "Oldest First"}
+            {filters.sort === 'difficulty' && "By Difficulty"}
+            {filters.sort === 'alphabetical' && "Alphabetical"}
             <ChevronDown className="w-4 h-4 ml-2" />
           </Button>
         </DropdownMenuTrigger>

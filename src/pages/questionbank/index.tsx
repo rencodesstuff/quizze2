@@ -1,4 +1,5 @@
 // pages/questionbank/index.tsx
+
 import React, { useState, useEffect, useCallback } from "react";
 import { useInView } from "react-intersection-observer";
 import { useRouter } from "next/router";
@@ -25,15 +26,13 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import {
-    Plus,
-    Download,
-    Upload,
-    Trash,
-    Tag,
-    Star,
-    MoreVertical,
-    Search,
-  } from "lucide-react";
+  Plus,
+  Download,
+  Upload,
+  Trash,
+  MoreVertical,
+  Search,
+} from "lucide-react";
 import { QuestionBankItem, QuestionBankFilters, CreateQuestionBankItem } from "../../../types/question-bank";
 
 const PAGE_SIZE = 20;
@@ -57,8 +56,8 @@ const QuestionBank = () => {
     searchTerm: "",
     types: [],
     difficulty: null,
-    subject: null,
-    topic: null,
+    category: null,
+    subcategory: null,
     tags: [],
     dateRange: { from: null, to: null },
     sort: 'newest',
