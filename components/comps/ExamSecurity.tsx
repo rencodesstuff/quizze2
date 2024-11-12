@@ -1,9 +1,37 @@
+// ExamSecurityWrapper.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '../../utils/supabase/component';
-import { AlertCircle, AlertTriangle } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { useRouter } from 'next/router';
 import ErrorModal from '@/comps/ErrorModal';
 import Modal from '@/comps/Modal';
+
+// Define interfaces for database records
+interface SecurityViolation {
+  quiz_id: string;
+  student_id: string;
+  violation_type: string;
+  student_name: string;
+  quiz_title: string;
+  occurred_at?: string;
+}
+
+interface QuizSubmission {
+  student_id: string;
+  quiz_id: string;
+  answers: Record<string, any>;
+  score: number;
+  total_questions: number;
+  correct_answers: number;
+  submitted_at?: string;
+}
+
+interface WarningPrompt {
+  show: boolean;
+  message: string;
+  type: 'warning' | 'error' | 'final';
+  violation: number;
+}
 
 interface ExamSecurityWrapperProps {
   children: React.ReactNode;
@@ -20,6 +48,67 @@ interface SecurityError {
   message: string;
   type: 'error' | 'warning';
 }
+
+const WarningPromptModal: React.FC<{
+  prompt: WarningPrompt;
+  onConfirm: () => void;
+  onSubmit?: () => void;
+}> = ({ prompt, onConfirm, onSubmit }) => {
+  const getIconAndColor = () => {
+    switch (prompt.type) {
+      case 'final':
+        return {
+          icon: <ShieldAlert className="w-12 h-12 text-red-500" />,
+          color: 'bg-red-600',
+          bgColor: 'bg-red-50'
+        };
+      case 'error':
+        return {
+          icon: <AlertCircle className="w-12 h-12 text-orange-500" />,
+          color: 'bg-orange-600',
+          bgColor: 'bg-orange-50'
+        };
+      default:
+        return {
+          icon: <AlertTriangle className="w-12 h-12 text-yellow-500" />,
+          color: 'bg-yellow-600',
+          bgColor: 'bg-yellow-50'
+        };
+    }
+  };
+
+  const { icon, color, bgColor } = getIconAndColor();
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className={`${bgColor} rounded-lg p-8 max-w-md w-full m-4 shadow-xl`}>
+        <div className="flex flex-col items-center text-center">
+          {icon}
+          <h3 className="text-xl font-bold mt-4 mb-2">Security Violation Warning</h3>
+          <p className="text-gray-600 mb-6">{prompt.message}</p>
+          
+          <div className="flex gap-4">
+            {prompt.type === 'final' ? (
+              <button
+                onClick={onSubmit}
+                className={`px-6 py-2 text-white rounded-lg ${color} hover:opacity-90 transition-opacity duration-200`}
+              >
+                End Quiz
+              </button>
+            ) : (
+              <button
+                onClick={onConfirm}
+                className={`px-6 py-2 text-white rounded-lg ${color} hover:opacity-90 transition-opacity duration-200`}
+              >
+                Return to Quiz
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({ 
   children, 
@@ -38,7 +127,27 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
   const [needsUserAction, setNeedsUserAction] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<SecurityError | null>(null);
+  const [warningPrompt, setWarningPrompt] = useState<WarningPrompt>({
+    show: false,
+    message: '',
+    type: 'warning',
+    violation: 0
+  });
+  
   const supabase = createClient();
+
+  const getWarningMessage = (violationCount: number) => {
+    switch (violationCount) {
+      case 1:
+        return "First violation detected! Please stay focused on your quiz. Further violations may result in automatic submission.";
+      case 2:
+        return "Second violation detected! This is your final warning. One more violation will result in automatic submission with a score of 0.";
+      case 3:
+        return "Maximum violations reached. Your quiz will be automatically submitted with a score of 0. Click 'End Quiz' to proceed.";
+      default:
+        return "Security violation detected. Please return to your quiz.";
+    }
+  };
 
   const handleError = useCallback((error: SecurityError) => {
     console.error(`Security Error: ${error.title}`, error);
@@ -49,6 +158,32 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
     setError(null);
   }, []);
 
+  const recordViolation = useCallback(async (
+    user_id: string,
+    violation_type: string
+  ): Promise<boolean> => {
+    try {
+      const violation: SecurityViolation = {
+        quiz_id: quizId,
+        student_id: user_id,
+        violation_type,
+        student_name: studentName,
+        quiz_title: quizTitle,
+        occurred_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from('quiz_security_violations')
+        .insert(violation);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error recording violation:', error);
+      return false;
+    }
+  }, [quizId, studentName, quizTitle, supabase]);
+
   const handleForcedSubmission = useCallback(async () => {
     if (isSubmitting) return;
     
@@ -57,60 +192,41 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
 
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      if (userError) {
-        throw {
-          title: 'Submission Error',
-          message: 'Authentication failed during submission. Please contact your instructor.',
-          type: 'error'
-        };
+      if (userError || !user) {
+        throw new Error('Authentication failed');
       }
 
-      if (!user) {
-        throw {
-          title: 'Session Error',
-          message: 'Session expired during submission. Your progress may be lost.',
-          type: 'error'
-        };
-      }
-
-      const { error: submissionError } = await supabase.from('quiz_submissions').insert({
+      const submission: QuizSubmission = {
         student_id: user.id,
         quiz_id: quizId,
         answers: {},
         score: 0,
         total_questions: 0,
-        correct_answers: 0
-      });
+        correct_answers: 0,
+        submitted_at: new Date().toISOString()
+      };
+
+      const { error: submissionError } = await supabase
+        .from('quiz_submissions')
+        .insert(submission);
 
       if (submissionError) {
-        throw {
-          title: 'Submission Failed',
-          message: 'Failed to submit quiz due to multiple security violations. Contact your instructor.',
-          type: 'error'
-        };
+        throw submissionError;
       }
 
-      const { error: violationError } = await supabase.from('quiz_security_violations').insert({
-        quiz_id: quizId,
-        student_id: user.id,
-        violation_type: 'max_violations_reached',
-        student_name: studentName,
-        quiz_title: quizTitle
-      });
-
-      if (violationError) {
-        handleError({
-          title: 'Warning',
-          message: 'Failed to log final violation. The incident has been recorded.',
-          type: 'warning'
-        });
-      }
+      await recordViolation(user.id, 'max_violations_reached');
 
       router.push('/stdinbox');
     } catch (error) {
-      handleError(error as SecurityError);
+      handleError({
+        title: 'Submission Failed',
+        message: 'Failed to submit quiz. Please contact your instructor.',
+        type: 'error'
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [isSubmitting, quizId, studentName, quizTitle, supabase, router, handleError]);
+  }, [isSubmitting, quizId, supabase, router, handleError, recordViolation]);
 
   const handleSecurityViolation = useCallback(async (violationType: string) => {
     if (!strictMode) return;
@@ -119,60 +235,42 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
       const newViolationCount = violationCount + 1;
       setViolationCount(newViolationCount);
 
+      setWarningPrompt({
+        show: true,
+        message: getWarningMessage(newViolationCount),
+        type: newViolationCount >= 3 ? 'final' : newViolationCount === 2 ? 'error' : 'warning',
+        violation: newViolationCount
+      });
+
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError) {
-        throw {
-          title: 'Authentication Error',
-          message: 'Unable to verify user identity. Please refresh the page and try again.',
-          type: 'error'
-        };
+      if (userError || !user) {
+        throw new Error('Authentication failed');
       }
 
-      if (!user) {
-        throw {
-          title: 'Session Error',
-          message: 'No active session found. Please log in again.',
-          type: 'error'
-        };
+      const recorded = await recordViolation(user.id, violationType);
+      if (!recorded) {
+        throw new Error('Failed to record violation');
       }
-
-      const { error: violationError } = await supabase.from('quiz_security_violations').insert({
-        quiz_id: quizId,
-        student_id: user.id,
-        violation_type: violationType,
-        student_name: studentName,
-        quiz_title: quizTitle
-      });
-
-      if (violationError) {
-        throw {
-          title: 'Security Warning',
-          message: 'Failed to record security violation. This incident will be reported.',
-          type: 'warning'
-        };
-      }
-
-      const channel = supabase.channel('security-violations');
-      await channel.send({
-        type: 'broadcast',
-        event: 'security_violation',
-        payload: {
-          quiz_id: quizId,
-          student_name: studentName,
-          violation_type: violationType,
-          teacher_id: teacherId,
-          violation_count: newViolationCount
-        }
-      });
 
       if (newViolationCount >= 3) {
-        await handleForcedSubmission();
+        setIsBlurred(true);
       }
     } catch (error) {
-      handleError(error as SecurityError);
+      handleError({
+        title: 'Security Warning',
+        message: 'A security violation has occurred. This incident has been recorded.',
+        type: 'warning'
+      });
     }
-  }, [quizId, teacherId, studentName, quizTitle, strictMode, violationCount, supabase, handleError, handleForcedSubmission]);
+  }, [quizId, strictMode, violationCount, recordViolation, handleError]);
+
+  const handlePromptConfirm = () => {
+    setWarningPrompt(prev => ({ ...prev, show: false }));
+    setIsBlurred(false);
+    setShowWarning(false);
+    setNeedsUserAction(false);
+    enterFullscreen();
+  };
 
   useEffect(() => {
     if (!strictMode) return;
@@ -226,45 +324,17 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
     }
   };
 
-  const handleReturnToQuiz = () => {
-    setNeedsUserAction(false);
-    setIsBlurred(false);
-    setShowWarning(false);
-    enterFullscreen();
-  };
-
-  if (strictMode && !isFullscreen) {
-    return (
-      <div className="fixed inset-0 bg-gray-900 text-white flex items-center justify-center z-50">
-        <div className="text-center p-8 bg-gray-800 rounded-lg shadow-xl">
-          <h1 className="text-2xl font-bold mb-4">Fullscreen Mode Required</h1>
-          <p className="mb-6">This quiz requires fullscreen mode. Please enter fullscreen mode to continue.</p>
-          <button
-            onClick={enterFullscreen}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition duration-150"
-          >
-            Enter Fullscreen Mode
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="relative">
       <div className={`transition-all duration-300 ${(isBlurred || needsUserAction) ? 'blur-sm' : ''}`}>
         {children}
       </div>
       
-      {(showWarning || needsUserAction) && (
-        <Modal
-          isOpen={true}
-          onClose={handleReturnToQuiz}
-          title="Security Warning"
-          message={`You have left the quiz page. This is violation ${violationCount} of 3. 
-            ${violationCount === 2 ? 'This is your final warning!' : ''}
-            ${violationCount >= 3 ? 'Maximum violations reached. Your quiz will be automatically submitted with a score of 0.' : 'Please return to the quiz immediately.'}`}
-          isError={violationCount >= 2}
+      {warningPrompt.show && (
+        <WarningPromptModal
+          prompt={warningPrompt}
+          onConfirm={handlePromptConfirm}
+          onSubmit={handleForcedSubmission}
         />
       )}
 
@@ -273,6 +343,21 @@ const ExamSecurityWrapper: React.FC<ExamSecurityWrapperProps> = ({
           message={error.message}
           onClose={clearError}
         />
+      )}
+
+      {strictMode && !isFullscreen && (
+        <div className="fixed inset-0 bg-gray-900 text-white flex items-center justify-center z-50">
+          <div className="text-center p-8 bg-gray-800 rounded-lg shadow-xl">
+            <h1 className="text-2xl font-bold mb-4">Fullscreen Mode Required</h1>
+            <p className="mb-6">This quiz requires fullscreen mode. Please enter fullscreen mode to continue.</p>
+            <button
+              onClick={enterFullscreen}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition duration-150"
+            >
+              Enter Fullscreen Mode
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
