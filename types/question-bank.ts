@@ -9,12 +9,13 @@ export type QuestionType =
 
 export type DifficultyLevel = "Easy" | "Medium" | "Hard";
 
+// Base interface for creating a question
 export interface CreateQuestionBankItem {
   question_text: string;
   type: QuestionType;
   difficulty: DifficultyLevel;
-  category: string;        // Added this line
-  subcategory: string;     // Added this line
+  category: string;
+  subcategory: string;
   correct_answer: string;
   options?: string[];
   explanation?: string;
@@ -24,10 +25,28 @@ export interface CreateQuestionBankItem {
   drag_drop_answers?: string[];
 }
 
+// Full question interface including database fields
 export interface QuestionBankItem extends CreateQuestionBankItem {
   id: string;
   teacher_id: string;
   created_at: string;
   is_active: boolean;
+  is_favorite: boolean;  // Added this field
   tags: string[];
+}
+
+// Filter interface for the question bank
+export interface QuestionBankFilters {
+  searchTerm?: string;
+  types?: QuestionType[];
+  difficulty?: DifficultyLevel | null;
+  category?: string | null;
+  subcategory?: string | null;
+  tags?: string[];
+  dateRange?: {
+    from: Date | null;
+    to: Date | null;
+  };
+  sort?: 'newest' | 'oldest' | 'difficulty' | 'alphabetical';
+  favorites?: boolean;
 }
