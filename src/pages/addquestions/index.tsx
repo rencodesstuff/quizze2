@@ -15,12 +15,7 @@ import {
 interface DatabaseQuestion {
   id?: string;
   quiz_id: string;
-  type:
-    | "multiple-choice"
-    | "true-false"
-    | "short-answer"
-    | "multiple-selection"
-    | "drag-drop";
+  type: "multiple-choice" | "true-false" | "short-answer" | "multiple-selection" | "drag-drop";
   text: string;
   options: any | null;
   correct_answer: string;
@@ -29,7 +24,9 @@ interface DatabaseQuestion {
   multiple_correct_answers: string[] | null;
   drag_drop_text: string[] | null;
   drag_drop_answers: string[] | null;
+  is_in_bank: boolean; // New field
 }
+
 
 interface Question {
   id?: string;
@@ -213,7 +210,7 @@ const AddQuestions: React.FC = memo(() => {
       if (!quizId || typeof quizId !== "string") {
         throw new Error("Quiz ID is not available or invalid");
       }
-
+  
       let questionData: DatabaseQuestion = {
         quiz_id: quizId,
         type: currentQuestion.type as DatabaseQuestion["type"],
@@ -225,8 +222,9 @@ const AddQuestions: React.FC = memo(() => {
         multiple_correct_answers: null,
         drag_drop_text: null,
         drag_drop_answers: null,
+        is_in_bank: true, // Automatically add to question bank
       };
-
+  
       if (currentQuestion.type === "drag-drop") {
         questionData = {
           ...questionData,
@@ -256,14 +254,14 @@ const AddQuestions: React.FC = memo(() => {
           correct_answer: currentQuestion.correct_answer,
         };
       }
-
+  
       const { data, error } = await supabase
         .from("questions")
         .insert([questionData])
         .select();
-
+  
       if (error) throw error;
-
+  
       if (data) {
         const newQuestion =
           data[0].type === "drag-drop"
@@ -278,9 +276,9 @@ const AddQuestions: React.FC = memo(() => {
                   ? JSON.parse(data[0].options)
                   : undefined,
               };
-
+  
         setQuestions((prev) => [...prev, newQuestion]);
-
+  
         // Reset form
         setCurrentQuestion({
           type: "multiple-choice",

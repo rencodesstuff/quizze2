@@ -1,8 +1,5 @@
-// components/FilterSection.tsx
-
 import React from 'react';
 import { cn } from "../../lib/utils";
-import { QuestionBankFilters, QuestionType, DifficultyLevel } from '../../types/question-bank';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,40 +9,42 @@ import {
   DropdownMenuSeparator,
 } from "@/ui/dropdown-menu";
 import { Button } from "@/ui/button";
-import { Calendar } from "@/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
-import { format } from "date-fns";
 import {
   Filter,
-  CalendarDays,
   GridIcon,
   LayoutList,
   ChevronDown,
 } from "lucide-react";
 
-const QuestionTypes: QuestionType[] = [
+const QuestionTypes = [
   "multiple-choice",
   "true-false",
   "short-answer",
   "multiple-selection",
   "drag-drop",
-];
+] as const;
 
-const DifficultyLevels: DifficultyLevel[] = ["Easy", "Medium", "Hard"];
+export interface QuestionFilters {
+  searchTerm: string;
+  types: string[];
+  quiz_id?: string | null;
+  sort: 'newest' | 'oldest';
+  inBank: boolean; // New filter
+}
 
-interface FilterSectionProps {
-  filters: QuestionBankFilters;
-  onFilterChange: (key: keyof QuestionBankFilters, value: any) => void;
+interface QuestionsFilterSectionProps {
+  filters: QuestionFilters;
+  onFilterChange: (key: keyof QuestionFilters, value: any) => void;
   viewMode: 'grid' | 'list';
   onViewModeChange: (mode: 'grid' | 'list') => void;
 }
 
-export function FilterSection({ 
+export function QuestionsFilterSection({ 
   filters, 
   onFilterChange, 
   viewMode, 
   onViewModeChange 
-}: FilterSectionProps) {
+}: QuestionsFilterSectionProps) {
   return (
     <div className="flex flex-wrap gap-2 items-center">
       {/* Question Types Filter */}
@@ -84,88 +83,6 @@ export function FilterSection({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Difficulty Filter */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button 
-            variant="outline" 
-            className="bg-white border-gray-200 hover:bg-gray-100"
-          >
-            {filters.difficulty || "All Difficulties"}
-            <ChevronDown className="w-4 h-4 ml-2" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent 
-          align="start" 
-          className="w-56 bg-white border border-gray-200 shadow-lg"
-        >
-          <DropdownMenuItem 
-            onClick={() => onFilterChange('difficulty', null)}
-            className="hover:bg-gray-100"
-          >
-            All Difficulties
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          {DifficultyLevels.map((level) => (
-            <DropdownMenuItem
-              key={level}
-              onClick={() => onFilterChange('difficulty', level)}
-              className={cn(
-                "hover:bg-gray-100",
-                filters.difficulty === level && "bg-gray-100"
-              )}
-            >
-              {level}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      {/* Date Range Filter */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button 
-            variant="outline" 
-            className="bg-white border-gray-200 hover:bg-gray-100"
-          >
-            <CalendarDays className="w-4 h-4 mr-2" />
-            {filters.dateRange.from ? (
-              filters.dateRange.to ? (
-                <>
-                  {format(filters.dateRange.from, "LLL dd, y")} -{" "}
-                  {format(filters.dateRange.to, "LLL dd, y")}
-                </>
-              ) : (
-                format(filters.dateRange.from, "LLL dd, y")
-              )
-            ) : (
-              "Date Range"
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent 
-          className="w-auto p-0 bg-white border border-gray-200 shadow-lg" 
-          align="start"
-        >
-  <Calendar
-    initialFocus
-    mode="range"
-    defaultMonth={filters.dateRange.from || undefined}
-    selected={{
-      from: filters.dateRange.from || undefined,
-      to: filters.dateRange.to || undefined
-    }}
-    onSelect={(range: { from?: Date; to?: Date } | undefined) => {
-      onFilterChange('dateRange', {
-        from: range?.from || null,
-        to: range?.to || null,
-      });
-    }}
-    numberOfMonths={2}
-  />
-        </PopoverContent>
-      </Popover>
-
       {/* Sort Order */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -173,10 +90,7 @@ export function FilterSection({
             variant="outline" 
             className="bg-white border-gray-200 hover:bg-gray-100"
           >
-            {filters.sort === 'newest' && "Newest First"}
-            {filters.sort === 'oldest' && "Oldest First"}
-            {filters.sort === 'difficulty' && "By Difficulty"}
-            {filters.sort === 'alphabetical' && "Alphabetical"}
+            {filters.sort === 'newest' ? "Newest First" : "Oldest First"}
             <ChevronDown className="w-4 h-4 ml-2" />
           </Button>
         </DropdownMenuTrigger>
@@ -201,24 +115,6 @@ export function FilterSection({
             )}
           >
             Oldest First
-          </DropdownMenuItem>
-          <DropdownMenuItem 
-            onClick={() => onFilterChange('sort', 'difficulty')}
-            className={cn(
-              "hover:bg-gray-100",
-              filters.sort === 'difficulty' && "bg-gray-100"
-            )}
-          >
-            By Difficulty
-          </DropdownMenuItem>
-          <DropdownMenuItem 
-            onClick={() => onFilterChange('sort', 'alphabetical')}
-            className={cn(
-              "hover:bg-gray-100",
-              filters.sort === 'alphabetical' && "bg-gray-100"
-            )}
-          >
-            Alphabetical
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
