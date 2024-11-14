@@ -238,7 +238,7 @@ export const ShareQuizDialog = ({ isOpen, onClose, quizId, quizTitle }: ShareQui
         <DialogHeader>
           <DialogTitle>Share Quiz</DialogTitle>
           <DialogDescription>
-            Share "{quizTitle}" with other teachers
+            Share &quot;{quizTitle}&quot; with other teachers
           </DialogDescription>
         </DialogHeader>
 
