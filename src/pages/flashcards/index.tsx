@@ -161,13 +161,13 @@ const ShareSetModal: React.FC<ShareSetModalProps> = ({
       <DialogContent className="sm:max-w-[425px] bg-white">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">
-            Share "{setTitle}"
+            Share &quot;{setTitle}&quot;
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
             <Label htmlFor="studentId" className="text-sm font-medium">
-              Friend's Student ID
+              Friend&apos;s Student ID
             </Label>
             <Input
               id="studentId"
