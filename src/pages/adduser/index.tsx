@@ -1,19 +1,70 @@
-import React, { useState } from 'react';
-import AdminLayout from '@/comps/admin-layout';
-import { createClient } from '@supabase/supabase-js';
+import React, { useState } from "react";
+import AdminLayout from "@/comps/admin-layout";
+import { createClient } from "@supabase/supabase-js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/ui/card";
+import { Button } from "@/ui/button";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/dialog";
+import { Badge } from "@/ui/badge";
+import {
+  UserPlus,
+  Mail,
+  IdCard,
+  BookOpen,
+  Copy,
+  CheckCircle,
+  Loader2,
+  User,
+  GraduationCap,
+  BookOpen as Course,
+} from "lucide-react";
+import { useToast } from "../../hooks/use-toast";
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
+// Password generator function remains the same
 const generateRandomPassword = (length: number = 12): string => {
-  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+";
-  let password = "";
-  for (let i = 0; i < length; i++) {
-    password += charset.charAt(Math.floor(Math.random() * charset.length));
+  const lowercase = "abcdefghijklmnopqrstuvwxyz";
+  const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const numbers = "0123456789";
+  const symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+
+  let password =
+    lowercase.charAt(Math.floor(Math.random() * lowercase.length)) +
+    uppercase.charAt(Math.floor(Math.random() * uppercase.length)) +
+    numbers.charAt(Math.floor(Math.random() * numbers.length)) +
+    symbols.charAt(Math.floor(Math.random() * symbols.length));
+
+  const allChars = lowercase + uppercase + numbers + symbols;
+  for (let i = password.length; i < length; i++) {
+    password += allChars.charAt(Math.floor(Math.random() * allChars.length));
   }
-  return password;
+
+  return password
+    .split("")
+    .sort(() => Math.random() - 0.5)
+    .join("");
 };
 
-const SuccessModal: React.FC<{
+interface SuccessModalProps {
   isOpen: boolean;
   onClose: () => void;
   userType: string;
@@ -21,138 +72,235 @@ const SuccessModal: React.FC<{
   email: string;
   id: string;
   password: string;
-}> = ({ isOpen, onClose, userType, name, email, id, password }) => {
-  if (!isOpen) return null;
+}
+
+const SuccessModal: React.FC<SuccessModalProps> = ({
+  isOpen,
+  onClose,
+  userType,
+  name,
+  email,
+  id,
+  password,
+}) => {
+  const { toast } = useToast();
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const copyToClipboard = async (text: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      toast({
+        title: "Copied!",
+        description: `${field} has been copied to clipboard`,
+        duration: 2000,
+      });
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to copy to clipboard",
+        duration: 2000,
+      });
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full" id="my-modal">
-      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div className="mt-3 text-center">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">User Added Successfully</h3>
-          <div className="mt-2 px-7 py-3">
-            <p className="text-sm text-gray-500">
-              {userType.charAt(0).toUpperCase() + userType.slice(1)} has been added to the database.
-            </p>
-            <p className="mt-1 text-sm text-gray-900"><strong>Name:</strong> {name}</p>
-            <p className="mt-1 text-sm text-gray-900"><strong>Email:</strong> {email}</p>
-            <p className="mt-1 text-sm text-gray-900"><strong>ID:</strong> {id}</p>
-            <p className="mt-1 text-sm text-gray-900"><strong>Temporary Password:</strong> {password}</p>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-green-500" />
+            User Created Successfully
+          </DialogTitle>
+          <DialogDescription>
+            New {userType} account has been created. Please save these
+            credentials:
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-lg border p-4 space-y-3">
+            {[
+              { label: "Name", value: name, icon: User },
+              { label: "Email", value: email, icon: Mail },
+              { label: "ID", value: id, icon: IdCard },
+              { label: "Temporary Password", value: password, icon: Copy },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <item.icon className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">{item.label}</p>
+                    <p className="text-sm text-muted-foreground font-mono">
+                      {item.value}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => copyToClipboard(item.value, item.label)}
+                  className={copiedField === item.label ? "text-green-500" : ""}
+                >
+                  {copiedField === item.label ? (
+                    <CheckCircle className="h-4 w-4" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            ))}
           </div>
-          <div className="items-center px-4 py-3">
-            <button
-              id="ok-btn"
-              className="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
-              onClick={onClose}
-            >
-              OK
-            </button>
-          </div>
+          <Alert className="bg-yellow-100 border-yellow-200">
+            {" "}
+            <AlertTitle>Important</AlertTitle>
+            <AlertDescription>
+              Please make sure to save or share these credentials securely. The
+              password cannot be retrieved later.
+            </AlertDescription>
+          </Alert>
+          <Button onClick={onClose} className="w-full">
+            Done
+          </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
 const AddUserPage: React.FC = () => {
-  const [userType, setUserType] = useState<'student' | 'teacher'>('student');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [id, setId] = useState('');
-  const [course, setCourse] = useState('');
+  // State declarations remain the same
+  const [userType, setUserType] = useState<"student" | "teacher">("student");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [id, setId] = useState("");
+  const [course, setCourse] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
-  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const { toast } = useToast();
 
+  const resetForm = () => {
+    setName("");
+    setEmail("");
+    setId("");
+    setCourse("");
+    setNewUserPassword("");
+  };
+
+  // handleSubmit function remains the same
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setMessage(null);
 
     try {
-      // Check if email already exists in auth.users
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        throw new Error("Please enter a valid email address");
+      }
+
+      // Check if email already exists
       const { data: existingAuthUser, error: authCheckError } = await supabase
-        .from('auth.users')
-        .select('email')
-        .eq('email', email)
+        .from("auth.users")
+        .select("email")
+        .eq("email", email)
         .single();
 
-      if (authCheckError && authCheckError.code !== 'PGRST116') {
+      if (authCheckError && authCheckError.code !== "PGRST116") {
         throw authCheckError;
       }
 
       if (existingAuthUser) {
-        throw new Error('A user with this email already exists.');
+        throw new Error("A user with this email already exists");
       }
 
-      // Check if student/teacher ID already exists
+      // Check if ID already exists
       const { data: existingUser, error: userCheckError } = await supabase
-        .from(userType === 'student' ? 'students' : 'teachers')
-        .select('id')
-        .eq(userType === 'student' ? 'student_id' : 'id', id)
+        .from(userType === "student" ? "students" : "teachers")
+        .select("id")
+        .eq(userType === "student" ? "student_id" : "id", id)
         .single();
 
-      if (userCheckError && userCheckError.code !== 'PGRST116') {
+      if (userCheckError && userCheckError.code !== "PGRST116") {
         throw userCheckError;
       }
 
       if (existingUser) {
-        throw new Error(`A ${userType} with this ID already exists.`);
+        throw new Error(`A ${userType} with this ID already exists`);
       }
 
+      // Generate password and create auth user
       const password = generateRandomPassword();
       setNewUserPassword(password);
 
       const { data: authUser, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            role: userType,
+          },
+        },
       });
 
       if (authError) throw authError;
-
-      if (!authUser.user) throw new Error('Failed to create user');
+      if (!authUser.user) throw new Error("Failed to create user account");
 
       const userId = authUser.user.id;
 
       // Add user details to the appropriate table
-      if (userType === 'student') {
-        const { error: studentError } = await supabase
-          .from('students')
-          .insert({
-            id: userId,
-            name,
-            student_id: id,
-            email,
-          });
+      if (userType === "student") {
+        const { error: studentError } = await supabase.from("students").insert({
+          id: userId,
+          name,
+          student_id: id,
+          email,
+        });
 
         if (studentError) throw studentError;
       } else {
-        const { error: teacherError } = await supabase
-          .from('teachers')
-          .insert({
-            id: userId,
-            name,
-            email,
-            course,
-          });
+        const { error: teacherError } = await supabase.from("teachers").insert({
+          id: userId,
+          name,
+          email,
+          course,
+        });
 
         if (teacherError) throw teacherError;
       }
 
       // Add user role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          id: userId,
-          role: userType,
-        });
+      const { error: roleError } = await supabase.from("user_roles").insert({
+        id: userId,
+        role: userType,
+      });
 
       if (roleError) throw roleError;
 
       setIsSuccessModalOpen(true);
+      toast({
+        title: "Success!",
+        description: `${
+          userType === "student" ? "Student" : "Teacher"
+        } account created successfully`,
+        duration: 5000,
+      });
     } catch (error) {
-      console.error('Error creating user:', error);
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to create user. Please try again.' });
+      console.error("Error creating user:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to create user. Please try again.",
+        duration: 5000,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -160,147 +308,147 @@ const AddUserPage: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="p-6 max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">Add New User</h1>
-        {message && (
-          <div className={`p-4 rounded-lg mb-6 ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-            {message.text}
-          </div>
-        )}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="flex space-x-4 mb-6">
-            <button
-              type="button"
-              onClick={() => setUserType('student')}
-              className={`flex-1 py-3 px-4 rounded-lg font-medium ${
-                userType === 'student'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              } transition duration-150`}
+      <div className="container flex items-center justify-center min-h-[80vh]">
+        <Card className="border-0 shadow-lg w-full max-w-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-2xl">
+              <UserPlus className="h-6 w-6" />
+              Add New User
+            </CardTitle>
+            <CardDescription>
+              Create a new student or teacher account with generated credentials
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs
+              defaultValue="student"
+              value={userType}
+              onValueChange={(v: any) => setUserType(v)}
             >
-              Student
-            </button>
-            <button
-              type="button"
-              onClick={() => setUserType('teacher')}
-              className={`flex-1 py-3 px-4 rounded-lg font-medium ${
-                userType === 'teacher'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              } transition duration-150`}
-            >
-              Teacher
-            </button>
-          </div>
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger
+                  value="student"
+                  className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
+                  <GraduationCap className="h-4 w-4" />
+                  Student
+                </TabsTrigger>
+                <TabsTrigger
+                  value="teacher"
+                  className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
+                  <BookOpen className="h-4 w-4" />
+                  Teacher
+                </TabsTrigger>
+              </TabsList>
 
-          <div>
-            <label htmlFor="name" className="block mb-2 text-sm font-medium text-gray-900">Full Name</label>
-            <div className="flex">
-              <span className="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-e-0 border-gray-300 rounded-s-md">
-                <svg className="w-4 h-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 0a10 10 0 1 0 10 10A10.011 10.011 0 0 0 10 0Zm0 5a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 13a8.949 8.949 0 0 1-4.951-1.488A3.987 3.987 0 0 1 9 13h2a3.987 3.987 0 0 1 3.951 3.512A8.949 8.949 0 0 1 10 18Z"/>
-                </svg>
-              </span>
-              <input
-                type="text"
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="rounded-none rounded-e-lg bg-gray-50 border border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500 block flex-1 min-w-0 w-full text-sm p-2.5"
-                placeholder="John Doe"
-                required
-              />
-            </div>
-          </div>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="name" className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Full Name
+                    </Label>
+                    <Input
+                      id="name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="John Doe"
+                      className="focus-visible:ring-2"
+                      required
+                    />
+                  </div>
 
-          <div>
-            <label htmlFor="email" className="block mb-2 text-sm font-medium text-gray-900">Email Address</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 start-0 flex items-center ps-3.5 pointer-events-none">
-                <svg className="w-4 h-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 16">
-                  <path d="m10.036 8.278 9.258-7.79A1.979 1.979 0 0 0 18 0H2A1.987 1.987 0 0 0 .641.541l9.395 7.737Z"/>
-                  <path d="M11.241 9.817c-.36.275-.801.425-1.255.427-.428 0-.845-.138-1.187-.395L0 2.6V14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V2.5l-8.759 7.317Z"/>
-                </svg>
-              </div>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full ps-10 p-2.5"
-                placeholder="john@example.com"
-                required
-              />
-            </div>
-          </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="email" className="flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      Email Address
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="john@example.com"
+                      className="focus-visible:ring-2"
+                      required
+                    />
+                  </div>
 
-          <div>
-            <label htmlFor="id" className="block mb-2 text-sm font-medium text-gray-900">{userType === 'student' ? 'Student ID' : 'Teacher ID'}</label>
-            <div className="flex">
-              <span className="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-e-0 border-gray-300 rounded-s-md">
-                <svg className="w-4 h-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M7 8a3 3 0 100-6 3 3 0 000 6zm7-3a2 2 0 11-4 0 2 2 0 014 0zm3 7a3 3 0 100-6 3 3 0 000 6z"/>
-                  <path d="M5 9c-2.209 0-4 1.791-4 4s1.791 4 4 4 4-1.791 4-4-1.791-4-4-4zm7 0c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3zm5 3c0-1.657-1.343-3-3-3v6c1.657 0 3-1.343 3-3z"/>
-                </svg>
-              </span>
-              <input
-                type="text"
-                id="id"
-                value={id}
-                onChange={(e) => setId(e.target.value)}
-                className="rounded-none rounded-e-lg bg-gray-50 border border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500 block flex-1 min-w-0 w-full text-sm p-2.5"
-                placeholder={userType === 'student' ? 'S12345' : 'T67890'}
-                required
-              />
-            </div>
-          </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="id" className="flex items-center gap-2">
+                      <IdCard className="h-4 w-4" />
+                      {userType === "student" ? "Student ID" : "Teacher ID"}
+                    </Label>
+                    <Input
+                      id="id"
+                      value={id}
+                      onChange={(e) => setId(e.target.value)}
+                      placeholder={userType === "student" ? "S12345" : "T67890"}
+                      className="focus-visible:ring-2"
+                      required
+                    />
+                  </div>
 
-          {userType === 'teacher' && (
-            <div>
-              <label htmlFor="course" className="block mb-2 text-sm font-medium text-gray-900">Course</label>
-              <div className="flex">
-                <span className="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-e-0 border-gray-300 rounded-s-md">
-                  <svg className="w-4 h-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M18 5H2a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V7a2 2 0 00-2-2zm-5.5 4.5a3 3 0 11-6 0 3 3 0 016 0zM2 18a2 2 0 012-2h12a2 2 0 012 2v2H2v-2z"/>
-                  </svg>
-                </span>
-                <input
-                  type="text"
-                  id="course"
-                  value={course}
-                  onChange={(e) => setCourse(e.target.value)}
-                  className="rounded-none rounded-e-lg bg-gray-50 border border-gray-300 text-gray-900 focus:ring-blue-500 focus:border-blue-500 block flex-1 min-w-0 w-full text-sm p-2.5"
-                  placeholder="Mathematics"
-                  required
-                />
-              </div>
-            </div>
-          )}
+                  {userType === "teacher" && (
+                    <div className="grid gap-2">
+                      <Label
+                        htmlFor="course"
+                        className="flex items-center gap-2"
+                      >
+                        <Course className="h-4 w-4" />
+                        Course
+                      </Label>
+                      <Input
+                        id="course"
+                        value={course}
+                        onChange={(e) => setCourse(e.target.value)}
+                        placeholder="Mathematics"
+                        className="focus-visible:ring-2"
+                        required
+                      />
+                    </div>
+                  )}
+                </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition duration-150 disabled:opacity-50"
-          >
-            {isLoading ? 'Creating...' : `Add ${userType === 'student' ? 'Student' : 'Teacher'}`}
-          </button>
-        </form>
+                <Button
+                  type="submit"
+                  className="w-full h-11"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Create {userType === "student"
+                        ? "Student"
+                        : "Teacher"}{" "}
+                      Account
+                    </>
+                  )}
+                </Button>
+              </form>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        <SuccessModal
+          isOpen={isSuccessModalOpen}
+          onClose={() => {
+            setIsSuccessModalOpen(false);
+            resetForm();
+          }}
+          userType={userType}
+          name={name}
+          email={email}
+          id={id}
+          password={newUserPassword}
+        />
       </div>
-      <SuccessModal
-        isOpen={isSuccessModalOpen}
-        onClose={() => {
-          setIsSuccessModalOpen(false);
-          setName('');
-          setEmail('');
-          setId('');
-          setCourse('');
-        }}
-        userType={userType}
-        name={name}
-        email={email}
-        id={id}
-        password={newUserPassword}
-      />
     </AdminLayout>
   );
 };
