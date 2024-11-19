@@ -1,4 +1,3 @@
-// pages/flashcards/index.tsx
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import StudentLayout from "@/comps/student-layout";
@@ -8,7 +7,6 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/ui/dialog";
 import { Label } from "@/ui/label";
 import { Input } from "@/ui/input";
-import { Textarea } from "@/ui/textarea";
 import { toast } from "../../hooks/use-toast";
 import {
   PlusIcon,
@@ -19,6 +17,7 @@ import {
   CollectionIcon,
   DocumentTextIcon,
   ArrowSmRightIcon,
+  TrashIcon,
 } from "@heroicons/react/outline";
 
 interface FlashcardSet {
@@ -30,12 +29,6 @@ interface FlashcardSet {
   mastery_level: number;
 }
 
-interface NewSetModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onCreate: (title: string, description: string) => Promise<void>;
-}
-
 interface ShareSetModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -43,91 +36,14 @@ interface ShareSetModalProps {
   setTitle: string;
 }
 
-const NewSetModal: React.FC<NewSetModalProps> = ({
-  isOpen,
-  onClose,
-  onCreate,
-}) => {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await onCreate(title, description);
-      setTitle("");
-      setDescription("");
-      onClose();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create flashcard set",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] bg-white">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold">
-            Create New Flashcard Set
-          </DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          <div className="space-y-2">
-            <Label htmlFor="title" className="text-sm font-medium">
-              Title
-            </Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter set title"
-              className="w-full"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="description" className="text-sm font-medium">
-              Description
-            </Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter set description"
-              className="w-full min-h-[100px]"
-              rows={3}
-            />
-          </div>
-          <div className="flex justify-end gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="bg-white"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="bg-blue-600 text-white hover:bg-blue-700"
-            >
-              {loading ? "Creating..." : "Create Set"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-};
+interface DeleteConfirmationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+  title: string;
+  message: string;
+  loading: boolean;
+}
 
 const ShareSetModal: React.FC<ShareSetModalProps> = ({
   isOpen,
@@ -196,6 +112,49 @@ const ShareSetModal: React.FC<ShareSetModalProps> = ({
             </Button>
           </div>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  loading,
+}) => {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px] bg-white">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold text-red-600">
+            {title}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="mt-4">
+          <p className="text-gray-600">{message}</p>
+        </div>
+        <div className="flex justify-end gap-3 mt-6">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="bg-white"
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={onConfirm}
+            disabled={loading}
+            className="bg-red-600 text-white hover:bg-red-700"
+          >
+            {loading ? "Deleting..." : "Delete"}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -271,9 +230,13 @@ const FlashcardsPage = () => {
   const [studentId, setStudentId] = useState("");
   const [sets, setSets] = useState<FlashcardSet[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showNewSetModal, setShowNewSetModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedSet, setSelectedSet] = useState<FlashcardSet | null>(null);
+  const [selectedSets, setSelectedSets] = useState<Set<string>>(new Set());
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  
   const router = useRouter();
   const supabase = createClient();
 
@@ -351,38 +314,6 @@ const FlashcardsPage = () => {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleCreateSet = async (title: string, description: string) => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const { data: set, error: setError } = await supabase
-        .from("flashcard_sets")
-        .insert({
-          student_id: user.id,
-          title,
-          description,
-        })
-        .select()
-        .single();
-
-      if (setError) throw setError;
-
-      toast({
-        title: "Success",
-        description: "Flashcard set created successfully",
-      });
-
-      await fetchFlashcardSets();
-      router.push(`/flashcards/${set.id}`);
-    } catch (error) {
-      console.error("Error creating set:", error);
-      throw error;
     }
   };
 
@@ -548,7 +479,8 @@ const FlashcardsPage = () => {
         if (setError) throw setError;
 
         // Insert cards
-        const { error: cardsError } = await supabase.from("flashcards").insert(
+        const { error: cardsError } = await supabase.from("flashcards")
+        .insert(
           importData.cards.map((card: any) => ({
             set_id: newSet.id,
             front_content: card.front,
@@ -593,41 +525,155 @@ const FlashcardsPage = () => {
   };
 
   const handleCreateNew = () => {
-    setShowNewSetModal(true);
+    router.push('/flashcards/create');
+  };
+
+  const handleDeleteSet = async (setId: string) => {
+    setDeleteLoading(true);
+    try {
+      const { error } = await supabase
+        .from("flashcard_sets")
+        .delete()
+        .eq("id", setId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Flashcard set deleted successfully",
+      });
+      
+      // Refresh the list
+      await fetchFlashcardSets();
+    } catch (error) {
+      console.error("Error deleting flashcard set:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete flashcard set",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteLoading(false);
+      setShowDeleteModal(false);
+    }
+  };
+
+  const handleDeleteMultipleSets = async () => {
+    setDeleteLoading(true);
+    try {
+      const { error } = await supabase
+        .from("flashcard_sets")
+        .delete()
+        .in("id", Array.from(selectedSets));
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `${selectedSets.size} flashcard sets deleted successfully`,
+      });
+      
+      // Clear selection and refresh the list
+      setSelectedSets(new Set());
+      setIsMultiSelectMode(false);
+      await fetchFlashcardSets();
+    } catch (error) {
+      console.error("Error deleting flashcard sets:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete flashcard sets",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteLoading(false);
+      setShowDeleteModal(false);
+    }
+  };
+
+  const toggleSetSelection = (setId: string) => {
+    const newSelection = new Set(selectedSets);
+    if (newSelection.has(setId)) {
+      newSelection.delete(setId);
+    } else {
+      newSelection.add(setId);
+    }
+    setSelectedSets(newSelection);
   };
 
   const renderCard = (set: FlashcardSet) => (
-    <Card key={set.id} className="hover:shadow-lg transition-shadow">
+    <Card 
+      key={set.id} 
+      className={`hover:shadow-lg transition-shadow relative ${
+        isMultiSelectMode ? 'cursor-pointer' : ''
+      } ${selectedSets.has(set.id) ? 'ring-2 ring-blue-500' : ''}`}
+      onClick={() => isMultiSelectMode && toggleSetSelection(set.id)}
+    >
+      {isMultiSelectMode && (
+        <div className="absolute top-2 left-2 z-10">
+          <input
+            type="checkbox"
+            checked={selectedSets.has(set.id)}
+            onChange={(e) => {
+              e.stopPropagation();
+              toggleSetSelection(set.id);
+            }}
+            className="h-5 w-5 rounded border-gray-300"
+          />
+        </div>
+      )}
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg font-semibold">{set.title}</CardTitle>
         <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push(`/flashcards/${set.id}`)}
-            className="hover:bg-gray-100"
-          >
-            <PlayIcon className="w-5 h-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleExport(set.id)}
-            className="hover:bg-gray-100"
-          >
-            <DownloadIcon className="w-5 h-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSelectedSet(set);
-              setShowShareModal(true);
-            }}
-            className="hover:bg-gray-100"
-          >
-            <ShareIcon className="w-5 h-5" />
-          </Button>
+          {!isMultiSelectMode && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/flashcards/${set.id}`);
+                }}
+                className="hover:bg-gray-100"
+              >
+                <PlayIcon className="w-5 h-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleExport(set.id);
+                }}
+                className="hover:bg-gray-100"
+              >
+                <DownloadIcon className="w-5 h-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedSet(set);
+                  setShowShareModal(true);
+                }}
+                className="hover:bg-gray-100"
+              >
+                <ShareIcon className="w-5 h-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedSet(set);
+                  setShowDeleteModal(true);
+                }}
+                className="hover:bg-red-100 text-red-600"
+              >
+                <TrashIcon className="w-5 h-5" />
+              </Button>
+            </>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -652,21 +698,52 @@ const FlashcardsPage = () => {
           </div>
           {sets.length > 0 && (
             <div className="flex gap-4">
-              <Button
-                onClick={handleCreateNew}
-                className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700"
-              >
-                <PlusIcon className="w-5 h-5" />
-                New Set
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleImportClick}
-                className="flex items-center gap-2 bg-white"
-              >
-                <UploadIcon className="w-5 h-5" />
-                Import
-              </Button>
+              {isMultiSelectMode ? (
+                <>
+                  <Button
+                    onClick={() => {
+                      setIsMultiSelectMode(false);
+                      setSelectedSets(new Set());
+                    }}
+                    variant="outline"
+                    className="bg-white"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => setShowDeleteModal(true)}
+                    disabled={selectedSets.size === 0}
+                    className="bg-red-600 text-white hover:bg-red-700"
+                  >
+                    Delete Selected ({selectedSets.size})
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    onClick={handleCreateNew}
+                    className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700"
+                  >
+                    <PlusIcon className="w-5 h-5" />
+                    New Set
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleImportClick}
+                    className="flex items-center gap-2 bg-white"
+                  >
+                    <UploadIcon className="w-5 h-5" />
+                    Import
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsMultiSelectMode(true)}
+                    className="flex items-center gap-2 bg-white"
+                  >
+                    Select Multiple
+                  </Button>
+                </>
+              )}
             </div>
           )}
           <input
@@ -693,10 +770,27 @@ const FlashcardsPage = () => {
           </div>
         )}
 
-        <NewSetModal
-          isOpen={showNewSetModal}
-          onClose={() => setShowNewSetModal(false)}
-          onCreate={handleCreateSet}
+        <DeleteConfirmationModal
+          isOpen={showDeleteModal}
+          onClose={() => {
+            setShowDeleteModal(false);
+            setSelectedSet(null);
+          }}
+          onConfirm={() => {
+            if (selectedSet) {
+              return handleDeleteSet(selectedSet.id);
+            } else if (selectedSets.size > 0) {
+              return handleDeleteMultipleSets();
+            }
+            return Promise.resolve();
+          }}
+          title={selectedSet ? "Delete Flashcard Set" : "Delete Multiple Sets"}
+          message={
+            selectedSet
+              ? "Are you sure you want to delete this flashcard set? This action cannot be undone."
+              : `Are you sure you want to delete ${selectedSets.size} flashcard sets? This action cannot be undone.`
+          }
+          loading={deleteLoading}
         />
 
         {selectedSet && (
