@@ -113,3 +113,13 @@ video {
   border-radius: 20px;
   border: transparent;
 }
+
+.perspective-1000 {
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+
+[style*="backface-visibility: hidden"] {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
