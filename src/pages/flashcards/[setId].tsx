@@ -332,7 +332,7 @@ const StudyFlashcards: React.FC = () => {
                   <Award className="w-16 h-16 mx-auto text-yellow-500 mb-4" />
                   <h2 className="text-2xl font-bold mb-2">Study Complete!</h2>
                   <p className="text-gray-600 mb-6">
-                    You've reviewed all the flashcards in this set.
+                    You&apos;ve reviewed all the flashcards in this set.
                   </p>
                   <div className="flex gap-4 justify-center">
                     <Button
