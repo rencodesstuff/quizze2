@@ -146,11 +146,12 @@ const StudentQuizzes = () => {
     },
   ];
 
+  // Updated loading state to match flashcards page
   if (studentLoading || isLoading) {
     return (
       <StudentLayout studentName="" studentId="">
         <div className="flex justify-center items-center h-screen">
-          <Loader className="w-32 h-32 animate-spin text-blue-500" />
+          <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900"></div>
         </div>
       </StudentLayout>
     );

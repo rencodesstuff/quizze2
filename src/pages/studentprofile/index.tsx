@@ -11,6 +11,7 @@ interface ProfileData {
 }
 
 const StudentProfile: React.FC = () => {
+  // State declarations
   const [profile, setProfile] = useState<ProfileData>({
     name: '',
     student_id: '',
@@ -141,7 +142,16 @@ const StudentProfile: React.FC = () => {
     }
   };
 
-  if (loading) return <StudentLayout studentName="" studentId=""><div>Loading...</div></StudentLayout>;
+  // Enhanced loading state with centered spinner
+  if (loading) {
+    return (
+      <StudentLayout studentName="" studentId="">
+        <div className="flex justify-center items-center h-screen">
+          <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900"></div>
+        </div>
+      </StudentLayout>
+    );
+  }
 
   return (
     <StudentLayout studentName={profile.name} studentId={profile.student_id}>
@@ -200,7 +210,7 @@ const StudentProfile: React.FC = () => {
                       value={value as string}
                       onChange={handleProfileChange}
                       className="w-full p-2 border rounded-md"
-                      readOnly={key === 'student_id' || key === 'email'} // Make student_id and email read-only
+                      readOnly={key === 'student_id' || key === 'email'}
                     />
                   </div>
                 );
