@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import AdminLayout from "@/comps/admin-layout";
-import { createClient } from "@supabase/supabase-js";
 import {
   Card,
   CardContent,
@@ -19,8 +18,8 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/ui/dialog";
-import { Badge } from "@/ui/badge";
 import {
   UserPlus,
   Mail,
@@ -32,15 +31,11 @@ import {
   User,
   GraduationCap,
   BookOpen as Course,
+  XCircle,
 } from "lucide-react";
 import { useToast } from "../../hooks/use-toast";
+import { createClient } from "../../../utils/supabase/component";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-// Password generator function remains the same
 const generateRandomPassword = (length: number = 12): string => {
   const lowercase = "abcdefghijklmnopqrstuvwxyz";
   const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -70,8 +65,13 @@ interface SuccessModalProps {
   userType: string;
   name: string;
   email: string;
-  id: string;
   password: string;
+}
+
+interface FailureModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  error: string;
 }
 
 const SuccessModal: React.FC<SuccessModalProps> = ({
@@ -80,7 +80,6 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
   userType,
   name,
   email,
-  id,
   password,
 }) => {
   const { toast } = useToast();
@@ -108,34 +107,32 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-500" />
+      <DialogContent className="sm:max-w-md bg-white dark:bg-gray-900">
+        <DialogHeader className="space-y-3">
+          <DialogTitle className="flex items-center gap-2 text-2xl">
+            <CheckCircle className="h-8 w-8 text-green-500" />
             User Created Successfully
           </DialogTitle>
-          <DialogDescription>
-            New {userType} account has been created. Please save these
-            credentials:
+          <DialogDescription className="text-base">
+            New {userType} account has been created. Please save these credentials:
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="rounded-lg border p-4 space-y-3">
+        <div className="space-y-6 py-4">
+          <div className="rounded-lg border border-gray-200 p-4 space-y-4">
             {[
               { label: "Name", value: name, icon: User },
               { label: "Email", value: email, icon: Mail },
-              { label: "ID", value: id, icon: IdCard },
               { label: "Temporary Password", value: password, icon: Copy },
             ].map((item) => (
               <div
                 key={item.label}
-                className="flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <item.icon className="h-4 w-4 text-muted-foreground" />
+                  <item.icon className="h-5 w-5 text-gray-500" />
                   <div>
-                    <p className="text-sm font-medium">{item.label}</p>
-                    <p className="text-sm text-muted-foreground font-mono">
+                    <p className="font-medium text-gray-700">{item.label}</p>
+                    <p className="text-sm text-gray-600 font-mono">
                       {item.value}
                     </p>
                   </div>
@@ -144,36 +141,79 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
                   variant="ghost"
                   size="sm"
                   onClick={() => copyToClipboard(item.value, item.label)}
-                  className={copiedField === item.label ? "text-green-500" : ""}
+                  className={`hover:bg-gray-200 ${
+                    copiedField === item.label ? "text-green-600" : ""
+                  }`}
                 >
                   {copiedField === item.label ? (
-                    <CheckCircle className="h-4 w-4" />
+                    <CheckCircle className="h-5 w-5" />
                   ) : (
-                    <Copy className="h-4 w-4" />
+                    <Copy className="h-5 w-5" />
                   )}
                 </Button>
               </div>
             ))}
           </div>
-          <Alert className="bg-yellow-100 border-yellow-200">
-            {" "}
-            <AlertTitle>Important</AlertTitle>
-            <AlertDescription>
+          <Alert className="bg-yellow-50 border-yellow-100 text-yellow-800">
+            <AlertTitle className="text-yellow-800 font-semibold">
+              Important Notice
+            </AlertTitle>
+            <AlertDescription className="text-yellow-700">
               Please make sure to save or share these credentials securely. The
               password cannot be retrieved later.
             </AlertDescription>
           </Alert>
-          <Button onClick={onClose} className="w-full">
+        </div>
+        <DialogFooter>
+          <Button onClick={onClose} className="w-full bg-green-600 hover:bg-green-700">
             Done
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const FailureModal: React.FC<FailureModalProps> = ({
+  isOpen,
+  onClose,
+  error,
+}) => {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md bg-white dark:bg-gray-900">
+        <DialogHeader className="space-y-3">
+          <DialogTitle className="flex items-center gap-2 text-2xl text-red-600">
+            <XCircle className="h-8 w-8 text-red-600" />
+            Failed to Create User
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <Alert variant="destructive" className="border-red-600">
+            <AlertTitle className="text-lg font-semibold">Error Details</AlertTitle>
+            <AlertDescription className="mt-2 text-base">
+              {error}
+            </AlertDescription>
+          </Alert>
+          <p className="text-gray-600">
+            Please try again or contact support if the issue persists.
+          </p>
         </div>
+        <DialogFooter>
+          <Button 
+            onClick={onClose} 
+            variant="destructive" 
+            className="w-full"
+          >
+            Close
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 };
 
 const AddUserPage: React.FC = () => {
-  // State declarations remain the same
   const [userType, setUserType] = useState<"student" | "teacher">("student");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -181,8 +221,12 @@ const AddUserPage: React.FC = () => {
   const [course, setCourse] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [isFailureModalOpen, setIsFailureModalOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [newUserPassword, setNewUserPassword] = useState("");
   const { toast } = useToast();
+
+  const supabase = createClient();
 
   const resetForm = () => {
     setName("");
@@ -192,7 +236,6 @@ const AddUserPage: React.FC = () => {
     setNewUserPassword("");
   };
 
-  // handleSubmit function remains the same
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -204,83 +247,65 @@ const AddUserPage: React.FC = () => {
         throw new Error("Please enter a valid email address");
       }
 
-      // Check if email already exists
-      const { data: existingAuthUser, error: authCheckError } = await supabase
-        .from("auth.users")
+      // Check if email exists in students or teachers table
+      const { data: existingStudent } = await supabase
+        .from("students")
         .select("email")
         .eq("email", email)
         .single();
 
-      if (authCheckError && authCheckError.code !== "PGRST116") {
-        throw authCheckError;
-      }
+      const { data: existingTeacher } = await supabase
+        .from("teachers")
+        .select("email")
+        .eq("email", email)
+        .single();
 
-      if (existingAuthUser) {
+      if (existingStudent || existingTeacher) {
         throw new Error("A user with this email already exists");
       }
 
-      // Check if ID already exists
-      const { data: existingUser, error: userCheckError } = await supabase
-        .from(userType === "student" ? "students" : "teachers")
-        .select("id")
-        .eq(userType === "student" ? "student_id" : "id", id)
-        .single();
+      if (userType === "student") {
+        // Check if student ID already exists
+        const { data: existingUser, error: userCheckError } = await supabase
+          .from("students")
+          .select("student_id")
+          .eq("student_id", id)
+          .single();
 
-      if (userCheckError && userCheckError.code !== "PGRST116") {
-        throw userCheckError;
+        if (userCheckError && userCheckError.code !== "PGRST116") {
+          throw userCheckError;
+        }
+
+        if (existingUser) {
+          throw new Error("A student with this ID already exists");
+        }
       }
 
-      if (existingUser) {
-        throw new Error(`A ${userType} with this ID already exists`);
-      }
-
-      // Generate password and create auth user
+      // Generate password
       const password = generateRandomPassword();
       setNewUserPassword(password);
 
-      const { data: authUser, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            role: userType,
-          },
+      const response = await fetch('/api/auth/create-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
+        body: JSON.stringify({
+          email,
+          password,
+          userType,
+          name,
+          studentId: userType === 'student' ? id : undefined,
+          course: userType === 'teacher' ? course : undefined,
+        }),
       });
 
-      if (authError) throw authError;
-      if (!authUser.user) throw new Error("Failed to create user account");
+      const responseData = await response.json();
 
-      const userId = authUser.user.id;
-
-      // Add user details to the appropriate table
-      if (userType === "student") {
-        const { error: studentError } = await supabase.from("students").insert({
-          id: userId,
-          name,
-          student_id: id,
-          email,
-        });
-
-        if (studentError) throw studentError;
-      } else {
-        const { error: teacherError } = await supabase.from("teachers").insert({
-          id: userId,
-          name,
-          email,
-          course,
-        });
-
-        if (teacherError) throw teacherError;
+      if (!response.ok) {
+        throw new Error(responseData.message || 'Failed to create user');
       }
-
-      // Add user role
-      const { error: roleError } = await supabase.from("user_roles").insert({
-        id: userId,
-        role: userType,
-      });
-
-      if (roleError) throw roleError;
 
       setIsSuccessModalOpen(true);
       toast({
@@ -292,15 +317,8 @@ const AddUserPage: React.FC = () => {
       });
     } catch (error) {
       console.error("Error creating user:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to create user. Please try again.",
-        duration: 5000,
-      });
+      setErrorMessage(error instanceof Error ? error.message : "An unknown error occurred");
+      setIsFailureModalOpen(true);
     } finally {
       setIsLoading(false);
     }
@@ -324,18 +342,25 @@ const AddUserPage: React.FC = () => {
               defaultValue="student"
               value={userType}
               onValueChange={(v: any) => setUserType(v)}
+              className="w-full"
             >
-              <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsList className="grid w-full grid-cols-2 mb-6 p-1 bg-muted rounded-lg">
                 <TabsTrigger
                   value="student"
-                  className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 
+                    ${userType === "student" 
+                      ? "border-2 border-primary bg-primary text-primary-foreground shadow-sm" 
+                      : "border-2 border-transparent hover:border-primary/30 hover:bg-muted"}`}
                 >
                   <GraduationCap className="h-4 w-4" />
                   Student
                 </TabsTrigger>
                 <TabsTrigger
                   value="teacher"
-                  className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 
+                    ${userType === "teacher" 
+                      ? "border-2 border-primary bg-primary text-primary-foreground shadow-sm" 
+                      : "border-2 border-transparent hover:border-primary/30 hover:bg-muted"}`}
                 >
                   <BookOpen className="h-4 w-4" />
                   Teacher
@@ -375,20 +400,22 @@ const AddUserPage: React.FC = () => {
                     />
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="id" className="flex items-center gap-2">
-                      <IdCard className="h-4 w-4" />
-                      {userType === "student" ? "Student ID" : "Teacher ID"}
-                    </Label>
-                    <Input
-                      id="id"
-                      value={id}
-                      onChange={(e) => setId(e.target.value)}
-                      placeholder={userType === "student" ? "S12345" : "T67890"}
-                      className="focus-visible:ring-2"
-                      required
-                    />
-                  </div>
+                  {userType === "student" && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="id" className="flex items-center gap-2">
+                        <IdCard className="h-4 w-4" />
+                        Student ID
+                      </Label>
+                      <Input
+                        id="id"
+                        value={id}
+                        onChange={(e) => setId(e.target.value)}
+                        placeholder="S12345"
+                        className="focus-visible:ring-2"
+                        required
+                      />
+                    </div>
+                  )}
 
                   {userType === "teacher" && (
                     <div className="grid gap-2">
@@ -424,9 +451,7 @@ const AddUserPage: React.FC = () => {
                   ) : (
                     <>
                       <UserPlus className="mr-2 h-4 w-4" />
-                      Create {userType === "student"
-                        ? "Student"
-                        : "Teacher"}{" "}
+                      Create {userType === "student" ? "Student" : "Teacher"}{" "}
                       Account
                     </>
                   )}
@@ -445,8 +470,15 @@ const AddUserPage: React.FC = () => {
           userType={userType}
           name={name}
           email={email}
-          id={id}
           password={newUserPassword}
+        />
+
+        <FailureModal
+          isOpen={isFailureModalOpen}
+          onClose={() => {
+            setIsFailureModalOpen(false);
+          }}
+          error={errorMessage}
         />
       </div>
     </AdminLayout>

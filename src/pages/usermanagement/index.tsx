@@ -25,6 +25,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction 
 } from "@/ui/alert-dialog";
+import { useToast } from '../../hooks/use-toast';
 
 // Define interfaces for type safety
 interface User {
@@ -49,6 +50,7 @@ const UserManagement: React.FC = () => {
 
   const supabase = createClient();
   const router = useRouter();
+  const { toast } = useToast();
 
   // Fetch users on component mount
   useEffect(() => {
@@ -91,12 +93,16 @@ const UserManagement: React.FC = () => {
       setUsers(formattedUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch users. Please refresh the page.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle user deletion
   const handleDeleteUsers = async () => {
     try {
       const studentIds = selectedUsers.filter(id => 
@@ -105,25 +111,112 @@ const UserManagement: React.FC = () => {
       const teacherIds = selectedUsers.filter(id => 
         users.find(u => u.id === id)?.role === 'teacher'
       );
-
+  
+      // Delete users from both user_roles and their respective tables
       if (studentIds.length) {
-        await supabase
-          .from('students')
-          .delete()
-          .in('id', studentIds);
+        // Delete from student-specific tables
+        const deleteStudentPromises = [
+          // Delete from quiz_submissions
+          supabase
+            .from('quiz_submissions')
+            .delete()
+            .in('student_id', studentIds),
+  
+          // Delete from student_quizzes
+          supabase
+            .from('student_quizzes')
+            .delete()
+            .in('student_id', studentIds),
+  
+          // Delete from quiz_security_violations
+          supabase
+            .from('quiz_security_violations')
+            .delete()
+            .in('student_id', studentIds),
+  
+          // Delete from flashcard_sets (will cascade delete flashcards)
+          supabase
+            .from('flashcard_sets')
+            .delete()
+            .in('student_id', studentIds),
+  
+          // Delete from login_streaks
+          supabase
+            .from('login_streaks')
+            .delete()
+            .in('user_id', studentIds),
+            
+          // Delete from students table
+          supabase
+            .from('students')
+            .delete()
+            .in('id', studentIds),
+        ];
+  
+        await Promise.all(deleteStudentPromises);
       }
-
+  
       if (teacherIds.length) {
-        await supabase
-          .from('teachers')
-          .delete()
-          .in('id', teacherIds);
+        const deleteTeacherPromises = [
+          // Delete from quizzes (will cascade delete related data)
+          supabase
+            .from('quizzes')
+            .delete()
+            .in('teacher_id', teacherIds),
+  
+          // Delete from shared_quizzes
+          supabase
+            .from('shared_quizzes')
+            .delete()
+            .or(`shared_by.in.(${teacherIds}),shared_with.in.(${teacherIds})`),
+  
+          // Delete from login_streaks
+          supabase
+            .from('login_streaks')
+            .delete()
+            .in('user_id', teacherIds),
+            
+          // Delete from teachers table
+          supabase
+            .from('teachers')
+            .delete()
+            .in('id', teacherIds),
+        ];
+  
+        await Promise.all(deleteTeacherPromises);
       }
-
+  
+      // Delete auth users and their roles through the API
+      const response = await fetch('/api/auth/delete-users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userIds: selectedUsers }),
+      });
+  
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to delete auth users');
+      }
+  
+      // Refresh the users list
       await fetchUsers();
       setSelectedUsers([]);
+      
+      toast({
+        title: "Success",
+        description: `Successfully deleted ${selectedUsers.length} user${selectedUsers.length > 1 ? 's' : ''}`,
+        variant: "default",
+      });
+  
     } catch (error) {
       console.error('Error deleting users:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete users. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -235,7 +328,7 @@ const UserManagement: React.FC = () => {
                       <AlertDialogTitle>Delete Selected Users</AlertDialogTitle>
                       <AlertDialogDescription>
                         Are you sure you want to delete {selectedUsers.length} selected users? 
-                        This action cannot be undone.
+                        This action cannot be undone and will remove all associated data.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -326,7 +419,7 @@ const UserManagement: React.FC = () => {
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
               >
-                <ChevronLeftIcon className="h-4 w-4 mr-2" />
+                <ChevronLeftIcon className="h-4 w-4mr-2" />
                 Previous
               </Button>
               {[...Array(totalPages)].map((_, index) => (
