@@ -9,6 +9,7 @@ body {
   font-family: 'Sora', sans-serif;
 }
 
+/* Animation keyframes */
 @keyframes shadowMove {
   from {
     transform: translateX(0);
@@ -18,35 +19,40 @@ body {
   }
 }
 
+/* Basic styles */
 .blur-sm {
   filter: blur(4px);
 }
 
-/* Remove default focus outlines */
-*:focus {
-  outline: none !important;
-  box-shadow: none !important;
+/* Form and Input Styles */
+input,
+button,
+a,
+select,
+textarea {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 1;
 }
 
-/* Add custom focus styles for accessibility */
-*:focus-visible {
-  outline: 2px solid #4299e1 !important; /* Tailwind blue-500 color */
+/* Focus styles */
+input:focus,
+button:focus,
+a:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid #4299e1;
   outline-offset: 2px;
+  z-index: 2;
 }
 
-/* Override Tremor focus styles */
-.tremor-base:focus, .tremor-base[data-focus] {
-  outline: none !important;
-  box-shadow: none !important;
-}
-
-/* Remove blue border from Tremor cards */
+/* Tremor specific styles */
 .tremor-Card-root {
   border: none !important;
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
 }
 
-/* QR Code Styling */
+/* QR Code Reader Styles */
 #qr-reader {
   border: none !important;
   width: 100% !important;
@@ -82,19 +88,21 @@ body {
   border: none !important;
 }
 
+/* Video element styles */
 video {
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;
 }
 
+/* iOS specific styles */
 @supports (-webkit-touch-callout: none) {
   .qr-scanner-viewport {
     height: 100% !important;
   }
 }
 
-/* Custom scrollbar styles */
+/* Custom scrollbar */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
@@ -114,6 +122,36 @@ video {
   border: transparent;
 }
 
+/* Form specific styles */
+form {
+  position: relative;
+  z-index: 20;
+}
+
+/* Input and Button styles */
+input, 
+button {
+  cursor: pointer;
+  position: relative;
+  z-index: 30;
+}
+
+/* Alert Dialog styles */
+.AlertDialog {
+  position: fixed;
+  z-index: 100;
+}
+
+/* Layout utilities */
+.relative {
+  position: relative;
+}
+
+.z-10 {
+  z-index: 10;
+}
+
+/* Flashcard styles */
 .perspective-1000 {
   perspective: 1000px;
   transform-style: preserve-3d;

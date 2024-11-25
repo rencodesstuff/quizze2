@@ -257,7 +257,7 @@ const QuizBank = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => router.push(`/quiz/${quiz.id}`)}
+                onClick={() => router.push(`/questionbank/${quiz.id}`)}
                 className="flex-1"
               >
                 <Eye className="w-4 h-4 mr-2" />

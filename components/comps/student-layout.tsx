@@ -1,3 +1,4 @@
+// student-layout.tsx
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Sidebar from "./sidebar";
@@ -14,7 +15,7 @@ interface StudentLayoutProps {
 const StudentLayout: React.FC<StudentLayoutProps> = ({ children, studentName, studentId }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [profilePictureUrl, setProfilePictureUrl] = useState("/ZabirHD.png"); // Default image
+  const [profilePictureUrl, setProfilePictureUrl] = useState("/default.png");
   const supabasecomp = createClientComp();
   const router = useRouter();
 
@@ -32,32 +33,32 @@ const StudentLayout: React.FC<StudentLayoutProps> = ({ children, studentName, st
     handleResize();
     window.addEventListener("resize", handleResize);
 
-    // Fetch user profile picture
     const fetchProfilePicture = async () => {
-      const { data: { user } } = await supabasecomp.auth.getUser();
-      if (user) {
-        const { data, error } = await supabasecomp
-          .from('students')
-          .select('profile_picture_url')
-          .eq('id', user.id)
-          .single();
+      try {
+        const { data: { user } } = await supabasecomp.auth.getUser();
+        if (user) {
+          const { data, error } = await supabasecomp
+            .from('students')
+            .select('profile_picture_url')
+            .eq('id', user.id)
+            .single();
 
-        if (data && data.profile_picture_url) {
-          setProfilePictureUrl(data.profile_picture_url);
+          if (data?.profile_picture_url) {
+            setProfilePictureUrl(data.profile_picture_url);
+          }
         }
+      } catch (error) {
+        setProfilePictureUrl("/default.png");
       }
     };
 
     fetchProfilePicture();
-
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const handleLogout = async () => {
     const { error } = await supabasecomp.auth.signOut();
-    if (error) {
-      console.log(error);
-    } else {
+    if (!error) {
       router.push("/signin");
     }
   };
