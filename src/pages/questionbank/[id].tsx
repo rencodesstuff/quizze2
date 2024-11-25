@@ -664,7 +664,7 @@ const ViewQuiz = () => {
                 Clone Quiz?
               </AlertDialogTitle>
               <AlertDialogDescription className="text-gray-700 text-base">
-                This will create a copy of the quiz for your use. You'll be able to modify settings,
+                This will create a copy of the quiz for your use. You&apos;ll be able to modify settings,
                 generate your own quiz code, and make any other changes you need.
               </AlertDialogDescription>
             </AlertDialogHeader>
