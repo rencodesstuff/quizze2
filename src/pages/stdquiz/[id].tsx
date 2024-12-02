@@ -56,6 +56,12 @@ interface ModalProps {
   children?: React.ReactNode;
 }
 
+interface TimeoutModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onRedirect: () => void;
+}
+
 // Helper function to safely parse JSON
 const safeJSONParse = (str: string | null) => {
   if (!str) return null;
@@ -105,6 +111,26 @@ const Modal: React.FC<ModalProps> = ({
             Close
           </button>
         )}
+      </div>
+    </div>
+  );
+};
+
+// Timeout Modal Component
+const TimeoutModal: React.FC<TimeoutModalProps> = ({ isOpen, onClose, onRedirect }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full m-4">
+        <h2 className="text-2xl font-bold mb-4 text-red-600">Time's Up!</h2>
+        <p className="mb-6">Your quiz time has expired. Your answers will be automatically submitted.</p>
+        <button
+          onClick={onRedirect}
+          className="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition duration-200"
+        >
+          Return to Dashboard
+        </button>
       </div>
     </div>
   );
@@ -166,6 +192,7 @@ const TakeQuiz: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showTimeoutModal, setShowTimeoutModal] = useState(false);
   const [modalState, setModalState] = useState({
     isOpen: false,
     title: "",
@@ -195,6 +222,35 @@ const TakeQuiz: React.FC = () => {
   const closeModal = useCallback(() => {
     setModalState((prev) => ({ ...prev, isOpen: false }));
   }, []);
+
+  // Timer effect with auto-submission
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0 || quizSubmitted) {
+      if (timeLeft === 0 && !quizSubmitted) {
+        setShowTimeoutModal(true);
+        handleSubmitQuiz(); // Auto-submit when time expires
+      }
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev !== null && prev > 0) {
+          const newTime = prev - 1;
+          if (newTime === 300) {
+            showError(
+              "Time Warning",
+              "You have 5 minutes remaining to complete the quiz."
+            );
+          }
+          return newTime;
+        }
+        return 0;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [timeLeft, quizSubmitted, showError]);
 
   // Question options validation
   const validateQuestionOptions = useCallback(
@@ -322,15 +378,19 @@ const TakeQuiz: React.FC = () => {
       if (submissionError) throw new Error("Failed to submit quiz");
 
       setQuizSubmitted(true);
-      showSuccess(
-        "Submission Successful",
-        "Your quiz has been submitted successfully!"
-      );
-
-      // Delay redirect
-      setTimeout(() => {
-        router.push("/stdinbox");
-      }, 2000);
+      
+      // Only show success message if not timed out
+      if (!showTimeoutModal) {
+        showSuccess(
+          "Submission Successful",
+          "Your quiz has been submitted successfully!"
+        );
+        
+        // Auto-redirect after normal submission
+        setTimeout(() => {
+          router.push("/stdinbox");
+        }, 2000);
+      }
     } catch (error) {
       showError(
         "Submission Error",
@@ -343,6 +403,11 @@ const TakeQuiz: React.FC = () => {
       setShowConfirmation(false);
     }
   };
+
+  // Handle timeout redirect
+  const handleTimeoutRedirect = useCallback(() => {
+    router.push("/stdinbox");
+  }, [router]);
 
   // Quiz data fetching
   useEffect(() => {
@@ -420,342 +485,320 @@ const TakeQuiz: React.FC = () => {
     fetchQuizData();
   }, [id, supabase, showError, validateQuestionOptions]);
 
-  // Timer effect
-  useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0 || quizSubmitted) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev !== null && prev > 0) {
-          const newTime = prev - 1;
-          if (newTime === 300) {
-            showError(
-              "Time Warning",
-              "You have 5 minutes remaining to complete the quiz."
-            );
-          }
-          return newTime;
-        }
-        return 0;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [timeLeft, quizSubmitted, showError]);
-
   // Answer handling
-  const handleAnswer = useCallback((questionId: string, answer: AnswerType) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]:
-        typeof answer === "string" ? answer : JSON.stringify(answer),
-    }));
-  }, []);
+const handleAnswer = useCallback((questionId: string, answer: AnswerType) => {
+  setAnswers((prev) => ({
+    ...prev,
+    [questionId]: typeof answer === "string" ? answer : JSON.stringify(answer),
+  }));
+}, []);
 
-  // Navigation handling
-  const handleNavigation = useCallback(
-    (direction: "next" | "prev") => {
-      if (!quiz) return;
+// Navigation handling
+const handleNavigation = useCallback(
+  (direction: "next" | "prev") => {
+    if (!quiz) return;
 
-      const newIndex =
-        direction === "next"
-          ? currentQuestionIndex + 1
-          : currentQuestionIndex - 1;
+    const newIndex =
+      direction === "next"
+        ? currentQuestionIndex + 1
+        : currentQuestionIndex - 1;
 
-      if (newIndex >= 0 && newIndex < quiz.questions.length) {
-        setCurrentQuestionIndex(newIndex);
-      }
-    },
-    [quiz, currentQuestionIndex]
-  );
-
-  // Question rendering
-  const renderQuestionOptions = (question: BaseQuestion) => {
-    const enhancedQuestion = {
-      ...question,
-      options:
-        typeof question.options === "string"
-          ? safeJSONParse(question.options)
-          : question.options,
-      multiple_correct_answers: Array.isArray(question.multiple_correct_answers)
-        ? question.multiple_correct_answers
-        : [],
-    };
-
-    let currentAnswer: AnswerType = answers[question.id] || "";
-    if (
-      typeof currentAnswer === "string" &&
-      (question.type === "multiple-selection" || question.type === "drag-drop")
-    ) {
-      try {
-        currentAnswer = currentAnswer ? JSON.parse(currentAnswer) : [];
-      } catch (e) {
-        console.error("Error parsing answer:", e);
-        currentAnswer = [];
-      }
+    if (newIndex >= 0 && newIndex < quiz.questions.length) {
+      setCurrentQuestionIndex(newIndex);
     }
+  },
+  [quiz, currentQuestionIndex]
+);
 
-    const commonProps = {
-      question: enhancedQuestion,
-      answers: { ...answers, [question.id]: currentAnswer } as Answers,
-      handleAnswer,
-      showExplanation: false,
-    };
-
-    switch (question.type) {
-      case "multiple-choice":
-        return enhancedQuestion.options ? (
-          <MultipleChoice {...commonProps} />
-        ) : (
-          <p className="text-red-500">
-            No options available for this question.
-          </p>
-        );
-
-      case "true-false":
-        return <TrueFalse {...commonProps} />;
-
-      case "short-answer":
-        return <ShortAnswer {...commonProps} />;
-
-      case "multiple-selection":
-        return enhancedQuestion.options ? (
-          <MultipleSelection {...commonProps} />
-        ) : (
-          <p className="text-red-500">
-            No options available for this question.
-          </p>
-        );
-
-      case "drag-drop":
-        return <DragDrop {...commonProps} />;
-
-      default:
-        console.error(`Unexpected question type: ${question.type}`);
-        return null;
-    }
+// Question rendering
+const renderQuestionOptions = (question: BaseQuestion) => {
+  const enhancedQuestion = {
+    ...question,
+    options:
+      typeof question.options === "string"
+        ? safeJSONParse(question.options)
+        : question.options,
+    multiple_correct_answers: Array.isArray(question.multiple_correct_answers)
+      ? question.multiple_correct_answers
+      : [],
   };
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900"></div>
-      </div>
-    );
+  let currentAnswer: AnswerType = answers[question.id] || "";
+  if (
+    typeof currentAnswer === "string" &&
+    (question.type === "multiple-selection" || question.type === "drag-drop")
+  ) {
+    try {
+      currentAnswer = currentAnswer ? JSON.parse(currentAnswer) : [];
+    } catch (e) {
+      console.error("Error parsing answer:", e);
+      currentAnswer = [];
+    }
   }
 
-  // Quiz content component
-  const QuizContent = () => {
-    const formatTime = (seconds: number) => {
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      return `${mins}:${secs.toString().padStart(2, "0")}`;
-    };
-
-    return (
-      <>
-        <header className="bg-white shadow-md p-4">
-          <div className="max-w-7xl mx-auto flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-800">{quiz?.title}</h1>
-            <div className="text-right">
-              <p className="text-sm text-gray-600">{studentInfo.name}</p>
-              <p className="text-sm text-gray-600">ID: {studentInfo.id}</p>
-              {timeLeft !== null && (
-                <p
-                  className={`text-sm font-bold ${
-                    timeLeft < 300
-                      ? "text-red-600"
-                      : timeLeft < 600
-                      ? "text-yellow-600"
-                      : "text-blue-600"
-                  }`}
-                >
-                  Time left: {formatTime(timeLeft)}
-                </p>
-              )}
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-grow flex p-4">
-          {/* Question Navigation Sidebar */}
-          <div className="w-1/4 bg-white shadow-xl rounded-lg p-4 mr-4 h-fit">
-            <h2 className="text-lg font-bold mb-4">Questions</h2>
-            <div className="space-y-2">
-              {quiz?.questions.map((q, index) => {
-                const isAnswered = q.id in answers && answers[q.id] !== "";
-
-                return (
-                  <button
-                    key={q.id}
-                    onClick={() => setCurrentQuestionIndex(index)}
-                    className={`w-full text-left p-2 rounded transition-colors duration-200 ${
-                      index === currentQuestionIndex
-                        ? "bg-blue-500 text-white"
-                        : isAnswered
-                        ? "bg-green-100 hover:bg-green-200"
-                        : "bg-gray-100 hover:bg-gray-200"
-                    }`}
-                  >
-                    <span>Question {index + 1}</span>
-                    {isAnswered && (
-                      <span className="ml-2 text-green-500">✓</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Main Question Area */}
-          <div className="flex-grow">
-            <div className="bg-white shadow-xl rounded-lg p-8">
-              {quiz?.questions[currentQuestionIndex] && (
-                <>
-                  <h2 className="text-xl font-bold mb-4">
-                    Question {currentQuestionIndex + 1} of{" "}
-                    {quiz.questions.length}
-                  </h2>
-
-                  <p className="text-lg mb-6">
-                    {quiz.questions[currentQuestionIndex].text}
-                  </p>
-
-                  {renderQuestionOptions(quiz.questions[currentQuestionIndex])}
-
-                  <div className="flex justify-between mt-6">
-                    <button
-                      onClick={() => handleNavigation("prev")}
-                      disabled={currentQuestionIndex === 0}
-                      className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors duration-150 disabled:opacity-50"
-                    >
-                      Previous
-                    </button>
-
-                    {currentQuestionIndex === quiz.questions.length - 1 ? (
-                      <button
-                        onClick={() => setShowConfirmation(true)}
-                        disabled={isSubmitting || quizSubmitted}
-                        className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors duration-150 disabled:opacity-50"
-                      >
-                        {isSubmitting ? "Submitting..." : "Submit Quiz"}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleNavigation("next")}
-                        className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-150"
-                      >
-                        Next
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </main>
-      </>
-    );
+  const commonProps = {
+    question: enhancedQuestion,
+    answers: { ...answers, [question.id]: currentAnswer } as Answers,
+    handleAnswer,
+    showExplanation: false,
   };
 
-  // Main render
+  switch (question.type) {
+    case "multiple-choice":
+      return enhancedQuestion.options ? (
+        <MultipleChoice {...commonProps} />
+      ) : (
+        <p className="text-red-500">No options available for this question.</p>
+      );
+
+    case "true-false":
+      return <TrueFalse {...commonProps} />;
+
+    case "short-answer":
+      return <ShortAnswer {...commonProps} />;
+
+    case "multiple-selection":
+      return enhancedQuestion.options ? (
+        <MultipleSelection {...commonProps} />
+      ) : (
+        <p className="text-red-500">No options available for this question.</p>
+      );
+
+    case "drag-drop":
+      return <DragDrop {...commonProps} />;
+
+    default:
+      console.error(`Unexpected question type: ${question.type}`);
+      return null;
+  }
+};
+
+// Loading state
+if (loading) {
   return (
-    <ErrorBoundary
-      onError={(error, errorInfo) => {
-        console.error("Error caught by boundary:", error, errorInfo);
-        showError(
-          "System Error",
-          "An unexpected error occurred. Please try refreshing the page."
-        );
-      }}
-    >
-      {/* Error/Success Modal */}
-      {modalState.isOpen && (
-        <Modal
-          isOpen={modalState.isOpen}
-          onClose={closeModal}
-          title={modalState.title}
-          message={modalState.message}
-          isError={modalState.isError}
-        />
-      )}
-
-      {/* Submission Confirmation Modal */}
-      {showConfirmation && (
-        <Modal
-          isOpen={true}
-          onClose={() => setShowConfirmation(false)}
-          title="Confirm Submission"
-          message="Are you sure you want to submit your quiz? This action cannot be undone."
-        >
-          <div className="flex justify-end space-x-4">
-            <button
-              onClick={() => setShowConfirmation(false)}
-              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-              disabled={isSubmitting}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmitQuiz}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Submitting..." : "Confirm Submit"}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {/* Main Quiz Content */}
-      {quiz && (
-  <div className="min-h-screen bg-gray-100">
-    {quiz.strict_mode ? (
-      <ExamSecurityWrapper
-        quizId={id as string}
-        teacherId={quiz.teacher_id}
-        studentName={studentInfo.name}
-        quizTitle={quiz.title}
-        strictMode={quiz.strict_mode}
-      >
-        <DeviceControl strictMode={quiz.strict_mode}>
-          <ResponsiveQuizContent
-            quiz={quiz}
-            currentQuestionIndex={currentQuestionIndex}
-            setCurrentQuestionIndex={setCurrentQuestionIndex}
-            answers={answers}
-            timeLeft={timeLeft}
-            studentInfo={studentInfo}
-            handleNavigation={handleNavigation}
-            setShowConfirmation={setShowConfirmation}
-            isSubmitting={isSubmitting}
-            quizSubmitted={quizSubmitted}
-            renderQuestionOptions={renderQuestionOptions}
-          />
-        </DeviceControl>
-      </ExamSecurityWrapper>
-    ) : (
-      <DeviceControl strictMode={quiz.strict_mode}>
-        <ResponsiveQuizContent
-          quiz={quiz}
-          currentQuestionIndex={currentQuestionIndex}
-          setCurrentQuestionIndex={setCurrentQuestionIndex}
-          answers={answers}
-          timeLeft={timeLeft}
-          studentInfo={studentInfo}
-          handleNavigation={handleNavigation}
-          setShowConfirmation={setShowConfirmation}
-          isSubmitting={isSubmitting}
-          quizSubmitted={quizSubmitted}
-          renderQuestionOptions={renderQuestionOptions}
-        />
-      </DeviceControl>
-    )}
-  </div>
-)}
-    </ErrorBoundary>
+    <div className="flex justify-center items-center h-screen">
+      <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900"></div>
+    </div>
   );
+}
+
+// Quiz content component
+const QuizContent = () => {
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  return (
+    <>
+      <header className="bg-white shadow-md p-4">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-800">{quiz?.title}</h1>
+          <div className="text-right">
+            <p className="text-sm text-gray-600">{studentInfo.name}</p>
+            <p className="text-sm text-gray-600">ID: {studentInfo.id}</p>
+            {timeLeft !== null && (
+              <p
+                className={`text-sm font-bold ${
+                  timeLeft < 300
+                    ? "text-red-600"
+                    : timeLeft < 600
+                    ? "text-yellow-600"
+                    : "text-blue-600"
+                }`}
+              >
+                Time left: {formatTime(timeLeft)}
+              </p>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-grow flex p-4">
+        {/* Question Navigation Sidebar */}
+        <div className="w-1/4 bg-white shadow-xl rounded-lg p-4 mr-4 h-fit">
+          <h2 className="text-lg font-bold mb-4">Questions</h2>
+          <div className="space-y-2">
+            {quiz?.questions.map((q, index) => {
+              const isAnswered = q.id in answers && answers[q.id] !== "";
+
+              return (
+                <button
+                  key={q.id}
+                  onClick={() => setCurrentQuestionIndex(index)}
+                  className={`w-full text-left p-2 rounded transition-colors duration-200 ${
+                    index === currentQuestionIndex
+                      ? "bg-blue-500 text-white"
+                      : isAnswered
+                      ? "bg-green-100 hover:bg-green-200"
+                      : "bg-gray-100 hover:bg-gray-200"
+                  }`}
+                >
+                  <span>Question {index + 1}</span>
+                  {isAnswered && (
+                    <span className="ml-2 text-green-500">✓</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Main Question Area */}
+        <div className="flex-grow">
+          <div className="bg-white shadow-xl rounded-lg p-8">
+            {quiz?.questions[currentQuestionIndex] && (
+              <>
+                <h2 className="text-xl font-bold mb-4">
+                  Question {currentQuestionIndex + 1} of {quiz.questions.length}
+                </h2>
+
+                <p className="text-lg mb-6">
+                  {quiz.questions[currentQuestionIndex].text}
+                </p>
+
+                {renderQuestionOptions(quiz.questions[currentQuestionIndex])}
+
+                <div className="flex justify-between mt-6">
+                  <button
+                    onClick={() => handleNavigation("prev")}
+                    disabled={currentQuestionIndex === 0}
+                    className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors duration-150 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+
+                  {currentQuestionIndex === quiz.questions.length - 1 ? (
+                    <button
+                      onClick={() => setShowConfirmation(true)}
+                      disabled={isSubmitting || quizSubmitted}
+                      className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors duration-150 disabled:opacity-50"
+                    >
+                      {isSubmitting ? "Submitting..." : "Submit Quiz"}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleNavigation("next")}
+                      className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-150"
+                    >
+                      Next
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </main>
+    </>
+  );
+};
+
+// Main render
+return (
+  <ErrorBoundary
+    onError={(error, errorInfo) => {
+      console.error("Error caught by boundary:", error, errorInfo);
+      showError(
+        "System Error",
+        "An unexpected error occurred. Please try refreshing the page."
+      );
+    }}
+  >
+    {/* Error/Success Modal */}
+    {modalState.isOpen && (
+      <Modal
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        title={modalState.title}
+        message={modalState.message}
+        isError={modalState.isError}
+      />
+    )}
+
+    {/* Submission Confirmation Modal */}
+    {showConfirmation && (
+      <Modal
+        isOpen={true}
+        onClose={() => setShowConfirmation(false)}
+        title="Confirm Submission"
+        message="Are you sure you want to submit your quiz? This action cannot be undone."
+      >
+        <div className="flex justify-end space-x-4">
+          <button
+            onClick={() => setShowConfirmation(false)}
+            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+            disabled={isSubmitting}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmitQuiz}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Submitting..." : "Confirm Submit"}
+          </button>
+        </div>
+      </Modal>
+    )}
+
+    {/* Timeout Modal */}
+    <TimeoutModal
+      isOpen={showTimeoutModal}
+      onClose={() => setShowTimeoutModal(false)}
+      onRedirect={handleTimeoutRedirect}
+    />
+
+    {/* Main Quiz Content */}
+    {quiz && !showTimeoutModal && !quizSubmitted && (
+      <div className="min-h-screen bg-gray-100">
+        {quiz.strict_mode ? (
+          <ExamSecurityWrapper
+            quizId={id as string}
+            teacherId={quiz.teacher_id}
+            studentName={studentInfo.name}
+            quizTitle={quiz.title}
+            strictMode={quiz.strict_mode}
+          >
+            <DeviceControl strictMode={quiz.strict_mode}>
+              <ResponsiveQuizContent
+                quiz={quiz}
+                currentQuestionIndex={currentQuestionIndex}
+                setCurrentQuestionIndex={setCurrentQuestionIndex}
+                answers={answers}
+                timeLeft={timeLeft}
+                studentInfo={studentInfo}
+                handleNavigation={handleNavigation}
+                setShowConfirmation={setShowConfirmation}
+                isSubmitting={isSubmitting}
+                quizSubmitted={quizSubmitted}
+                renderQuestionOptions={renderQuestionOptions}
+              />
+            </DeviceControl>
+          </ExamSecurityWrapper>
+        ) : (
+          <DeviceControl strictMode={quiz.strict_mode}>
+            <ResponsiveQuizContent
+              quiz={quiz}
+              currentQuestionIndex={currentQuestionIndex}
+              setCurrentQuestionIndex={setCurrentQuestionIndex}
+              answers={answers}
+              timeLeft={timeLeft}
+              studentInfo={studentInfo}
+              handleNavigation={handleNavigation}
+              setShowConfirmation={setShowConfirmation}
+              isSubmitting={isSubmitting}
+              quizSubmitted={quizSubmitted}
+              renderQuestionOptions={renderQuestionOptions}
+            />
+          </DeviceControl>
+        )}
+      </div>
+    )}
+  </ErrorBoundary>
+);
 };
 
 export default TakeQuiz;

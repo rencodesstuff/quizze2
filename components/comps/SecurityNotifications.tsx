@@ -1,4 +1,3 @@
-// components/SecurityNotifications.tsx
 import React, { useEffect, useState } from 'react';
 import { createClient } from '../../utils/supabase/component';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -24,46 +23,45 @@ interface RealtimePayload {
 
 const SecurityNotifications: React.FC = () => {
   const [violations, setViolations] = useState<SecurityViolation[]>([]);
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const supabase = createClient();
 
   useEffect(() => {
+    const saved = localStorage.getItem('dismissedViolations');
+    if (saved) {
+      setDismissedIds(JSON.parse(saved));
+    }
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (isLoading) return;
+
     let channel: ReturnType<typeof supabase.channel>;
 
     const setupRealtimeSubscription = async () => {
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
-        
-        if (error || !user) {
-          console.error('Authentication error:', error);
-          return;
-        }
+        if (!user) return;
 
-        // First get the teacher's quizzes
-        const { data: teacherQuizzes, error: quizError } = await supabase
+        const { data: teacherQuizzes } = await supabase
           .from('quizzes')
           .select('id')
           .eq('teacher_id', user.id);
 
-        if (quizError) {
-          console.error('Error fetching teacher quizzes:', quizError);
-          return;
-        }
+        if (!teacherQuizzes?.length) return;
 
-        const quizIds = teacherQuizzes?.map(quiz => quiz.id) || [];
+        const { data: existingViolations } = await supabase
+          .from('quiz_security_violations')
+          .select('*')
+          .in('quiz_id', teacherQuizzes.map(quiz => quiz.id))
+          .order('occurred_at', { ascending: false });
 
-        if (quizIds.length > 0) {
-          // Fetch violations for teacher's quizzes
-          const { data: existingViolations, error: fetchError } = await supabase
-            .from('quiz_security_violations')
-            .select('*')
-            .in('quiz_id', quizIds)
-            .order('occurred_at', { ascending: false })
-            .limit(5);
-
-          if (fetchError) {
-            console.error('Error fetching existing violations:', fetchError);
-          } else if (existingViolations) {
-            const formattedViolations: SecurityViolation[] = existingViolations.map(v => ({
+        if (existingViolations) {
+          const filteredViolations = existingViolations
+            .filter(violation => !dismissedIds.includes(violation.id))
+            .map(v => ({
               id: v.id,
               student_name: v.student_name,
               quiz_title: v.quiz_title,
@@ -71,11 +69,10 @@ const SecurityNotifications: React.FC = () => {
               occurred_at: v.occurred_at,
               quiz_id: v.quiz_id
             }));
-            setViolations(formattedViolations);
-          }
+          
+          setViolations(filteredViolations);
         }
 
-        // Set up realtime subscription
         channel = supabase.channel('security-violations-channel')
           .on(
             'broadcast',
@@ -88,49 +85,46 @@ const SecurityNotifications: React.FC = () => {
                   quiz_title: payload.payload.quiz_title,
                   violation_type: payload.payload.violation_type,
                   occurred_at: new Date().toISOString(),
-                  quiz_id: 'realtime' // This is just for realtime notifications
+                  quiz_id: 'realtime'
                 };
                 
-                console.log('New violation received:', newViolation);
-                setViolations(prev => [newViolation, ...prev]);
+                if (!dismissedIds.includes(newViolation.id)) {
+                  setViolations(prev => [newViolation, ...prev]);
+                }
               }
             }
           );
 
-        await channel.subscribe((status) => {
-          console.log('Subscription status:', status);
-        });
-
+        await channel.subscribe();
       } catch (error) {
-        console.error('Error setting up realtime subscription:', error);
+        console.error('Error:', error);
       }
     };
 
     setupRealtimeSubscription();
 
     return () => {
-      if (channel) {
-        channel.unsubscribe();
-      }
+      channel?.unsubscribe();
     };
-  }, []);
+  }, [dismissedIds, isLoading]);
 
   const removeNotification = (id: string) => {
+    const updatedDismissedIds = [...dismissedIds, id];
+    setDismissedIds(updatedDismissedIds);
+    localStorage.setItem('dismissedViolations', JSON.stringify(updatedDismissedIds));
     setViolations(prev => prev.filter(v => v.id !== id));
   };
 
   const formatViolationMessage = (type: string): string => {
     switch (type) {
-      case 'tab_switch':
-        return 'switched tabs';
-      case 'window_blur':
-        return 'left the quiz window';
-      case 'fullscreen_exit':
-        return 'exited fullscreen mode';
-      default:
-        return 'performed an unauthorized action';
+      case 'tab_switch': return 'switched tabs';
+      case 'window_blur': return 'left the quiz window';
+      case 'fullscreen_exit': return 'exited fullscreen mode';
+      default: return 'performed an unauthorized action';
     }
   };
+
+  if (isLoading) return null;
 
   return (
     <div className="fixed bottom-4 right-4 space-y-4 z-50">
