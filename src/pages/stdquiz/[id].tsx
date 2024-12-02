@@ -123,7 +123,7 @@ const TimeoutModal: React.FC<TimeoutModalProps> = ({ isOpen, onClose, onRedirect
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full m-4">
-        <h2 className="text-2xl font-bold mb-4 text-red-600">Time's Up!</h2>
+        <h2 className="text-2xl font-bold mb-4 text-red-600">Time&apos;s Up!</h2>
         <p className="mb-6">Your quiz time has expired. Your answers will be automatically submitted.</p>
         <button
           onClick={onRedirect}
