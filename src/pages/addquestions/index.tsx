@@ -1,4 +1,3 @@
-// AddQuestions.tsx
 import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useRouter } from "next/router";
 import TeacherLayout from "@/comps/teacher-layout";

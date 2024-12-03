@@ -85,7 +85,11 @@ const Modal: React.FC<ModalProps> = ({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-sm w-full">
         <div className="p-4">
-          <h2 className={`text-lg font-semibold ${isError ? "text-red-600" : "text-gray-900"}`}>
+          <h2
+            className={`text-lg font-semibold ${
+              isError ? "text-red-600" : "text-gray-900"
+            }`}
+          >
             {title}
           </h2>
           <p className="mt-2 text-gray-600">{message}</p>
@@ -95,7 +99,9 @@ const Modal: React.FC<ModalProps> = ({
             <button
               onClick={onClose}
               className={`w-full py-2 px-4 rounded-md text-white ${
-                isError ? "bg-red-500 hover:bg-red-600" : "bg-blue-500 hover:bg-blue-600"
+                isError
+                  ? "bg-red-500 hover:bg-red-600"
+                  : "bg-blue-500 hover:bg-blue-600"
               } transition-colors`}
             >
               Close
@@ -107,16 +113,23 @@ const Modal: React.FC<ModalProps> = ({
   );
 };
 
-const TimeoutModal: React.FC<TimeoutModalProps> = ({ isOpen, onClose, onRedirect }) => {
+const TimeoutModal: React.FC<TimeoutModalProps> = ({
+  isOpen,
+  onClose,
+  onRedirect,
+}) => {
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-sm w-full">
         <div className="p-4">
-          <h2 className="text-lg font-semibold text-red-600">Time&apos;s Up!</h2>
+          <h2 className="text-lg font-semibold text-red-600">
+            Time&apos;s Up!
+          </h2>
           <p className="mt-2 text-gray-600">
-            Your quiz time has expired. Your answers will be automatically submitted.
+            Your quiz time has expired. Your answers will be automatically
+            submitted.
           </p>
         </div>
         <div className="border-t p-4">
@@ -193,6 +206,8 @@ const TakeQuiz: React.FC = () => {
     isError: false,
   });
 
+  const [questionOrder, setQuestionOrder] = useState<string[]>([]);
+
   const showError = useCallback((title: string, message: string) => {
     setModalState({ isOpen: true, title, message, isError: true });
   }, []);
@@ -202,14 +217,14 @@ const TakeQuiz: React.FC = () => {
   }, []);
 
   const closeModal = useCallback(() => {
-    setModalState(prev => ({ ...prev, isOpen: false }));
+    setModalState((prev) => ({ ...prev, isOpen: false }));
   }, []);
 
   useEffect(() => {
     if (!timeLeft || quizSubmitted || !quiz?.duration_minutes) return;
 
     const timer = setInterval(() => {
-      setTimeLeft(prev => {
+      setTimeLeft((prev) => {
         if (!prev) return null;
         const newTime = prev - 1;
         if (newTime === 300) {
@@ -222,52 +237,75 @@ const TakeQuiz: React.FC = () => {
     return () => clearInterval(timer);
   }, [timeLeft, quizSubmitted, quiz?.duration_minutes]);
 
-  const validateQuestionOptions = useCallback((question: BaseQuestion): string[] | null => {
-    let parsedOptions = question.options;
-
-    if (typeof question.options === "string") {
-      parsedOptions = safeJSONParse(question.options);
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
+    return shuffled;
+  };
 
-    switch (question.type) {
-      case "multiple-choice":
-      case "multiple-selection":
-        if (Array.isArray(parsedOptions) && parsedOptions.every(opt => typeof opt === "string")) {
-          return parsedOptions.map(opt => opt.trim());
-        }
-        return null;
+  const validateQuestionOptions = useCallback(
+    (question: BaseQuestion): string[] | null => {
+      let parsedOptions = question.options;
 
-      case "true-false":
-        return ["True", "False"];
+      if (typeof question.options === "string") {
+        parsedOptions = safeJSONParse(question.options);
+      }
 
-      case "short-answer":
-      case "drag-drop":
-        return null;
+      switch (question.type) {
+        case "multiple-choice":
+        case "multiple-selection":
+          if (
+            Array.isArray(parsedOptions) &&
+            parsedOptions.every((opt) => typeof opt === "string")
+          ) {
+            return parsedOptions.map((opt) => opt.trim());
+          }
+          return null;
 
-      default:
-        console.warn(`Unexpected question type: ${question.type}`);
-        return null;
-    }
-  }, []);
+        case "true-false":
+          return ["True", "False"];
+
+        case "short-answer":
+        case "drag-drop":
+          return null;
+
+        default:
+          console.warn(`Unexpected question type: ${question.type}`);
+          return null;
+      }
+    },
+    []
+  );
 
   const handleSubmitQuiz = async () => {
-    if (!quiz || typeof id !== "string" || isSubmitting || quizSubmitted) return;
+    if (!quiz || typeof id !== "string" || isSubmitting || quizSubmitted)
+      return;
 
     setIsSubmitting(true);
 
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
       if (userError || !user) throw new Error("Authentication error");
 
-      const processedAnswers = Object.entries(answers).reduce<Record<string, any>>((acc, [qId, answer]) => {
-        const question = quiz.questions.find(q => q.id === qId);
+      // Process answers while maintaining the original question order
+      const processedAnswers = Object.entries(answers).reduce<
+        Record<string, any>
+      >((acc, [qId, answer]) => {
+        const question = quiz.questions.find((q) => q.id === qId);
         if (!question) return acc;
 
         let processedAnswer = answer;
         try {
           if (
             typeof answer === "string" &&
-            (question.type === "multiple-selection" || question.type === "drag-drop")
+            (question.type === "multiple-selection" ||
+              question.type === "drag-drop")
           ) {
             processedAnswer = JSON.parse(answer);
           }
@@ -278,16 +316,23 @@ const TakeQuiz: React.FC = () => {
         return { ...acc, [qId]: processedAnswer };
       }, {});
 
-      const score = quiz.questions.reduce((acc, q) => {
-        const processedAnswer = processedAnswers[q.id];
+      // Calculate score using the stored question order
+      const score = questionOrder.reduce((acc, qId) => {
+        const question = quiz.questions.find((q) => q.id === qId);
+        if (!question) return acc;
+
+        const processedAnswer = processedAnswers[qId];
         let isCorrect = false;
 
-        switch (q.type) {
+        switch (question.type) {
           case "multiple-selection":
-            const correctAnswers = Array.isArray(q.multiple_correct_answers)
-              ? q.multiple_correct_answers
-              : typeof q.multiple_correct_answers === "string" && q.multiple_correct_answers
-              ? safeJSONParse(q.multiple_correct_answers) || []
+            const correctAnswers = Array.isArray(
+              question.multiple_correct_answers
+            )
+              ? question.multiple_correct_answers
+              : typeof question.multiple_correct_answers === "string" &&
+                question.multiple_correct_answers
+              ? safeJSONParse(question.multiple_correct_answers) || []
               : [];
             isCorrect =
               JSON.stringify(processedAnswer?.sort()) ===
@@ -295,7 +340,7 @@ const TakeQuiz: React.FC = () => {
             break;
 
           case "drag-drop":
-            const correctDragAnswers = q.dragDropAnswers || [];
+            const correctDragAnswers = question.dragDropAnswers || [];
             const studentDragAnswers = Array.isArray(processedAnswer)
               ? processedAnswer
               : typeof processedAnswer === "string"
@@ -309,7 +354,7 @@ const TakeQuiz: React.FC = () => {
           default:
             isCorrect =
               String(processedAnswer).toLowerCase() ===
-              String(q.correct_answer).toLowerCase();
+              String(question.correct_answer).toLowerCase();
         }
 
         return acc + (isCorrect ? 1 : 0);
@@ -334,7 +379,9 @@ const TakeQuiz: React.FC = () => {
     } catch (error) {
       showError(
         "Error",
-        `Failed to submit quiz: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Failed to submit quiz: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
       );
     } finally {
       setIsSubmitting(false);
@@ -351,7 +398,10 @@ const TakeQuiz: React.FC = () => {
       if (typeof id !== "string") return;
 
       try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
         if (userError || !user) throw new Error("Authentication error");
 
         const [studentData, quizData] = await Promise.all([
@@ -362,32 +412,47 @@ const TakeQuiz: React.FC = () => {
             .single(),
           supabase
             .from("quizzes")
-            .select(`
+            .select(
+              `
               id, title, duration_minutes, release_date,
               randomize_arrangement, strict_mode, teacher_id,
               questions (*)
-            `)
+            `
+            )
             .eq("id", id)
             .single(),
         ]);
 
-        if (studentData.error || quizData.error) throw new Error("Failed to fetch data");
+        if (studentData.error || quizData.error)
+          throw new Error("Failed to fetch data");
 
         setStudentInfo({
           name: studentData.data.name,
           id: studentData.data.student_id,
         });
 
-        const validatedQuestions = quizData.data.questions.map((q: BaseQuestion) => ({
-          ...q,
-          options: validateQuestionOptions(q),
-          dragDropAnswers: q.type === "drag-drop" ? q.drag_drop_answers || [] : undefined,
-          dragDropText: q.type === "drag-drop" ? q.drag_drop_text || [] : undefined,
-        }));
+        const validatedQuestions = quizData.data.questions.map(
+          (q: BaseQuestion) => ({
+            ...q,
+            options: validateQuestionOptions(q),
+            dragDropAnswers:
+              q.type === "drag-drop" ? q.drag_drop_answers || [] : undefined,
+            dragDropText:
+              q.type === "drag-drop" ? q.drag_drop_text || [] : undefined,
+          })
+        );
+
+        // If randomize_arrangement is true, shuffle the questions
+        const finalQuestions = quizData.data.randomize_arrangement
+          ? shuffleArray(validatedQuestions)
+          : validatedQuestions;
+
+        // Store the question order for submission
+        setQuestionOrder(finalQuestions.map((q) => q.id));
 
         setQuiz({
           ...quizData.data,
-          questions: validatedQuestions,
+          questions: finalQuestions,
         });
 
         if (quizData.data.duration_minutes) {
@@ -396,7 +461,9 @@ const TakeQuiz: React.FC = () => {
       } catch (error) {
         showError(
           "Error",
-          `Failed to load quiz: ${error instanceof Error ? error.message : "Unknown error"}`
+          `Failed to load quiz: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
         );
       } finally {
         setLoading(false);
@@ -407,9 +474,10 @@ const TakeQuiz: React.FC = () => {
   }, [id, validateQuestionOptions]);
 
   const handleAnswer = useCallback((questionId: string, answer: AnswerType) => {
-    setAnswers(prev => ({
+    setAnswers((prev) => ({
       ...prev,
-      [questionId]: typeof answer === "string" ? answer : JSON.stringify(answer),
+      [questionId]:
+        typeof answer === "string" ? answer : JSON.stringify(answer),
     }));
   }, []);
 
@@ -418,7 +486,9 @@ const TakeQuiz: React.FC = () => {
       if (!quiz) return;
 
       const newIndex =
-        direction === "next" ? currentQuestionIndex + 1 : currentQuestionIndex - 1;
+        direction === "next"
+          ? currentQuestionIndex + 1
+          : currentQuestionIndex - 1;
 
       if (newIndex >= 0 && newIndex < quiz.questions.length) {
         setCurrentQuestionIndex(newIndex);
@@ -430,14 +500,20 @@ const TakeQuiz: React.FC = () => {
   const renderQuestionOptions = (question: BaseQuestion) => {
     const enhancedQuestion = {
       ...question,
-      options: typeof question.options === "string" ? safeJSONParse(question.options) : question.options,
+      options:
+        typeof question.options === "string"
+          ? safeJSONParse(question.options)
+          : question.options,
       multiple_correct_answers: Array.isArray(question.multiple_correct_answers)
         ? question.multiple_correct_answers
         : [],
     };
 
     let currentAnswer: AnswerType = answers[question.id] || "";
-    if (typeof currentAnswer === "string" && (question.type === "multiple-selection" || question.type === "drag-drop")) {
+    if (
+      typeof currentAnswer === "string" &&
+      (question.type === "multiple-selection" || question.type === "drag-drop")
+    ) {
       try {
         currentAnswer = currentAnswer ? JSON.parse(currentAnswer) : [];
       } catch (e) {
@@ -458,7 +534,9 @@ const TakeQuiz: React.FC = () => {
         return enhancedQuestion.options ? (
           <MultipleChoice {...commonProps} />
         ) : (
-          <p className="text-red-500">No options available for this question.</p>
+          <p className="text-red-500">
+            No options available for this question.
+          </p>
         );
       case "true-false":
         return <TrueFalse {...commonProps} />;
@@ -468,7 +546,9 @@ const TakeQuiz: React.FC = () => {
         return enhancedQuestion.options ? (
           <MultipleSelection {...commonProps} />
         ) : (
-          <p className="text-red-500">No options available for this question.</p>
+          <p className="text-red-500">
+            No options available for this question.
+          </p>
         );
       case "drag-drop":
         return <DragDrop {...commonProps} />;
@@ -511,11 +591,15 @@ const TakeQuiz: React.FC = () => {
               </div>
             </div>
             {timeLeft !== null && (
-              <div className={`px-3 py-1.5 rounded-full text-sm font-medium ${
-                timeLeft < 300 ? "bg-red-100 text-red-700" : 
-                timeLeft < 600 ? "bg-yellow-100 text-yellow-700" : 
-                "bg-blue-100 text-blue-700"
-              }`}>
+              <div
+                className={`px-3 py-1.5 rounded-full text-sm font-medium ${
+                  timeLeft < 300
+                    ? "bg-red-100 text-red-700"
+                    : timeLeft < 600
+                    ? "bg-yellow-100 text-yellow-700"
+                    : "bg-blue-100 text-blue-700"
+                }`}
+              >
                 {formatTime(timeLeft)}
               </div>
             )}
@@ -533,11 +617,13 @@ const TakeQuiz: React.FC = () => {
                   className={`
                     h-8 min-w-[2rem] px-2 rounded-full flex items-center justify-center
                     text-sm font-medium transition-colors
-                    ${index === currentQuestionIndex 
-                      ? "bg-blue-500 text-white" 
-                      : answers[quiz.questions[index].id]
-                      ? "bg-green-100 text-green-700"
-                      : "bg-gray-100 text-gray-600"}
+                    ${
+                      index === currentQuestionIndex
+                        ? "bg-blue-500 text-white"
+                        : answers[quiz.questions[index].id]
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-600"
+                    }
                   `}
                 >
                   {index + 1}
@@ -558,7 +644,7 @@ const TakeQuiz: React.FC = () => {
                 {quiz.questions[currentQuestionIndex].text}
               </p>
             </div>
-            
+
             <div className="p-4">
               {renderQuestionOptions(quiz.questions[currentQuestionIndex])}
             </div>
@@ -604,7 +690,10 @@ const TakeQuiz: React.FC = () => {
     <ErrorBoundary
       onError={(error, errorInfo) => {
         console.error("Error:", error, errorInfo);
-        showError("Error", "An unexpected error occurred. Please refresh the page.");
+        showError(
+          "Error",
+          "An unexpected error occurred. Please refresh the page."
+        );
       }}
     >
       {modalState.isOpen && (

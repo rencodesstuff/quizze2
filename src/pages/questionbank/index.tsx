@@ -22,7 +22,6 @@ import {
   BookOpen,
   Share2,
   Eye,
-  Edit,
   Shield,
   Shuffle,
 } from "lucide-react";
@@ -51,8 +50,8 @@ interface Quiz {
 
 interface QuizFilters {
   searchTerm: string;
-  sortBy: 'newest' | 'oldest' | 'alphabetical';
-  view: 'my-quizzes' | 'shared-with-me';
+  sortBy: "newest" | "oldest" | "alphabetical";
+  view: "my-quizzes" | "shared-with-me";
 }
 
 const PAGE_SIZE = 12;
@@ -63,31 +62,43 @@ const QuizBank = () => {
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [filters, setFilters] = useState<QuizFilters>({
     searchTerm: "",
-    sortBy: 'newest',
-    view: 'my-quizzes'
+    sortBy: "newest",
+    view: "my-quizzes",
   });
 
   const router = useRouter();
   const { toast } = useToast();
-  const [ref, inView] = useInView();
+  const { ref, inView } = useInView({
+    threshold: 0.1,
+    delay: 100,
+  });
   const supabase = createClient();
 
-  const fetchQuizzes = useCallback(async (reset = false) => {
-    try {
-      setLoading(true);
-      const currentPage = reset ? 0 : page;
+  const fetchQuizzes = useCallback(
+    async (reset = false) => {
+      if (isLoadingMore && !reset) return;
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      try {
+        const loadingState = reset ? setLoading : setIsLoadingMore;
+        loadingState(true);
 
-      let query;
+        const currentPage = reset ? 0 : page;
 
-      if (filters.view === 'shared-with-me') {
-        query = supabase
-          .from('shared_quizzes')
-          .select(`
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) throw new Error("Not authenticated");
+
+        let query;
+
+        if (filters.view === "shared-with-me") {
+          query = supabase
+            .from("shared_quizzes")
+            .select(
+              `
             access_code,
             quizzes!inner (
               *,
@@ -97,103 +108,116 @@ const QuizBank = () => {
               name,
               email
             )
-          `)
-          .eq('shared_with', user.id);
+          `
+            )
+            .eq("shared_with", user.id);
 
-        // Apply search
-        if (filters.searchTerm) {
-          query = query.ilike('quizzes.title', `%${filters.searchTerm}%`);
-        }
+          if (filters.searchTerm) {
+            query = query.ilike("quizzes.title", `%${filters.searchTerm}%`);
+          }
 
-        // Apply sort
-        switch (filters.sortBy) {
-          case 'newest':
-            query = query.order('created_at', { ascending: false });
-            break;
-          case 'oldest':
-            query = query.order('created_at', { ascending: true });
-            break;
-          case 'alphabetical':
-            query = query.order('quizzes(title)', { ascending: true });
-            break;
-        }
-      } else {
-        query = supabase
-          .from('quizzes')
-          .select(`
+          switch (filters.sortBy) {
+            case "newest":
+              query = query.order("created_at", { ascending: false });
+              break;
+            case "oldest":
+              query = query.order("created_at", { ascending: true });
+              break;
+            case "alphabetical":
+              query = query.order("quizzes(title)", { ascending: true });
+              break;
+          }
+        } else {
+          query = supabase
+            .from("quizzes")
+            .select(
+              `
             *,
             questions (count)
-          `, { count: 'exact' })
-          .eq('teacher_id', user.id);
+          `,
+              { count: "exact" }
+            )
+            .eq("teacher_id", user.id);
 
-        if (filters.searchTerm) {
-          query = query.ilike('title', `%${filters.searchTerm}%`);
+          if (filters.searchTerm) {
+            query = query.ilike("title", `%${filters.searchTerm}%`);
+          }
+
+          switch (filters.sortBy) {
+            case "newest":
+              query = query.order("created_at", { ascending: false });
+              break;
+            case "oldest":
+              query = query.order("created_at", { ascending: true });
+              break;
+            case "alphabetical":
+              query = query.order("title", { ascending: true });
+              break;
+          }
         }
 
-        switch (filters.sortBy) {
-          case 'newest':
-            query = query.order('created_at', { ascending: false });
-            break;
-          case 'oldest':
-            query = query.order('created_at', { ascending: true });
-            break;
-          case 'alphabetical':
-            query = query.order('title', { ascending: true });
-            break;
+        query = query.range(
+          currentPage * PAGE_SIZE,
+          (currentPage + 1) * PAGE_SIZE - 1
+        );
+
+        const { data, error: fetchError, count } = await query;
+
+        if (fetchError) throw fetchError;
+
+        let transformedQuizzes: Quiz[] =
+          filters.view === "shared-with-me"
+            ? data?.map((item) => ({
+                ...item.quizzes,
+                question_count: item.quizzes.questions[0]?.count || 0,
+                shared_by: {
+                  name: item.teachers.name,
+                  email: item.teachers.email,
+                },
+                access_code: item.access_code,
+                is_shared: true,
+              })) || []
+            : data?.map((quiz) => ({
+                ...quiz,
+                question_count: quiz.questions[0]?.count || 0,
+              })) || [];
+
+        if (reset) {
+          setQuizzes(transformedQuizzes);
+          setPage(1);
+        } else {
+          setQuizzes((prev) => [...prev, ...transformedQuizzes]);
+          setPage((prev) => prev + 1);
+        }
+
+        setHasMore(count ? (currentPage + 1) * PAGE_SIZE < count : false);
+      } catch (err) {
+        console.error("Error fetching quizzes:", err);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load quizzes. Please try again.",
+        });
+      } finally {
+        if (reset) {
+          setLoading(false);
+        } else {
+          setIsLoadingMore(false);
         }
       }
-
-      query = query.range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
-
-      const { data, error: fetchError, count } = await query;
-
-      if (fetchError) throw fetchError;
-
-      let transformedQuizzes: Quiz[];
-
-      if (filters.view === 'shared-with-me') {
-        transformedQuizzes = data?.map(item => ({
-          ...item.quizzes,
-          question_count: item.quizzes.questions[0]?.count || 0,
-          shared_by: {
-            name: item.teachers.name,
-            email: item.teachers.email
-          },
-          access_code: item.access_code,
-          is_shared: true
-        })) || [];
-      } else {
-        transformedQuizzes = data?.map(quiz => ({
-          ...quiz,
-          question_count: quiz.questions[0]?.count || 0
-        })) || [];
-      }
-
-      setQuizzes(prev => reset ? transformedQuizzes : [...prev, ...transformedQuizzes]);
-      setHasMore(count ? (currentPage + 1) * PAGE_SIZE < count : false);
-      setPage(prev => reset ? 1 : prev + 1);
-
-    } catch (err) {
-      console.error('Error fetching quizzes:', err);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load quizzes. Please try again.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [page, filters, toast, supabase]);
+    },
+    [page, filters, toast, supabase, isLoadingMore]
+  );
 
   useEffect(() => {
     fetchQuizzes(true);
   }, [fetchQuizzes, filters]);
 
   useEffect(() => {
-    if (inView && hasMore && !loading) {
-      fetchQuizzes();
+    if (inView && hasMore && !loading && !isLoadingMore) {
+      fetchQuizzes(false);
     }
-  }, [inView, hasMore, loading, fetchQuizzes]);
+  }, [inView, hasMore, loading, isLoadingMore, fetchQuizzes]);
 
   const QuizCard = ({ quiz }: { quiz: Quiz }) => {
     const [showShareDialog, setShowShareDialog] = useState(false);
@@ -211,9 +235,13 @@ const QuizBank = () => {
               <div>
                 <CardTitle className="text-xl mb-1">{quiz.title}</CardTitle>
                 <CardDescription className="flex items-center gap-2">
-                  <span>Code: {quiz.is_shared ? quiz.access_code : quiz.code}</span>
+                  <span>
+                    Code: {quiz.is_shared ? quiz.access_code : quiz.code}
+                  </span>
                   <span>•</span>
-                  <span>{format(new Date(quiz.created_at), 'MMM d, yyyy')}</span>
+                  <span>
+                    {format(new Date(quiz.created_at), "MMM d, yyyy")}
+                  </span>
                 </CardDescription>
                 {quiz.is_shared && quiz.shared_by && (
                   <p className="text-sm text-gray-500 mt-1">
@@ -227,7 +255,9 @@ const QuizBank = () => {
             <div className="space-y-3 mb-4">
               <div className="flex items-center text-sm text-gray-600">
                 <Clock className="w-4 h-4 mr-2" />
-                {quiz.duration_minutes ? `${quiz.duration_minutes} minutes` : 'No time limit'}
+                {quiz.duration_minutes
+                  ? `${quiz.duration_minutes} minutes`
+                  : "No time limit"}
               </div>
               <div className="flex items-center text-sm text-gray-600">
                 <BookOpen className="w-4 h-4 mr-2" />
@@ -252,7 +282,7 @@ const QuizBank = () => {
                 </div>
               )}
             </div>
-            
+
             <div className="mt-auto flex gap-2">
               <Button
                 variant="outline"
@@ -264,26 +294,15 @@ const QuizBank = () => {
                 View
               </Button>
               {!quiz.is_shared && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowShareDialog(true)}
-                    className="flex-1"
-                  >
-                    <Share2 className="w-4 h-4 mr-2" />
-                    Share
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push(`/quiz/${quiz.id}/edit`)}
-                    className="flex-1"
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit
-                  </Button>
-                </>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowShareDialog(true)}
+                  className="flex-1"
+                >
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share
+                </Button>
               )}
             </div>
           </CardContent>
@@ -311,10 +330,10 @@ const QuizBank = () => {
               {quizzes.length} quizzes available
             </p>
           </div>
-          
-          {filters.view === 'my-quizzes' && (
+
+          {filters.view === "my-quizzes" && (
             <Button
-              onClick={() => router.push('/createquiz')}
+              onClick={() => router.push("/createquiz")}
               className="bg-blue-600 hover:bg-blue-700"
             >
               Create New Quiz
@@ -325,15 +344,21 @@ const QuizBank = () => {
         <div className="mb-6 space-y-4">
           <div className="flex gap-4">
             <Button
-              variant={filters.view === 'my-quizzes' ? 'default' : 'outline'}
-              onClick={() => setFilters(prev => ({ ...prev, view: 'my-quizzes' }))}
+              variant={filters.view === "my-quizzes" ? "default" : "outline"}
+              onClick={() =>
+                setFilters((prev) => ({ ...prev, view: "my-quizzes" }))
+              }
               className="flex-1 sm:flex-none"
             >
               My Quizzes
             </Button>
             <Button
-              variant={filters.view === 'shared-with-me' ? 'default' : 'outline'}
-              onClick={() => setFilters(prev => ({ ...prev, view: 'shared-with-me' }))}
+              variant={
+                filters.view === "shared-with-me" ? "default" : "outline"
+              }
+              onClick={() =>
+                setFilters((prev) => ({ ...prev, view: "shared-with-me" }))
+              }
               className="flex-1 sm:flex-none"
             >
               Shared with Me
@@ -347,16 +372,23 @@ const QuizBank = () => {
                 placeholder="Search quizzes..."
                 className="pl-8"
                 value={filters.searchTerm}
-                onChange={(e) => setFilters(prev => ({ ...prev, searchTerm: e.target.value }))}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    searchTerm: e.target.value,
+                  }))
+                }
               />
             </div>
             <select
               className="p-2 border rounded-md"
               value={filters.sortBy}
-              onChange={(e) => setFilters(prev => ({ 
-                ...prev, 
-                sortBy: e.target.value as QuizFilters['sortBy']
-              }))}
+              onChange={(e) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  sortBy: e.target.value as QuizFilters["sortBy"],
+                }))
+              }
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
@@ -400,19 +432,20 @@ const QuizBank = () => {
               <BookOpen className="w-12 h-12 text-gray-400" />
             </div>
             <h3 className="text-lg font-medium text-gray-900">
-              {filters.view === 'my-quizzes' ? 'No quizzes yet' : 'No shared quizzes'}
+              {filters.view === "my-quizzes"
+                ? "No quizzes yet"
+                : "No shared quizzes"}
             </h3>
             <p className="text-gray-500 mt-2">
-              {filters.view === 'my-quizzes' 
-                ? 'Create your first quiz to get started'
-                : 'No quizzes have been shared with you yet'
-              }
+              {filters.view === "my-quizzes"
+                ? "Create your first quiz to get started"
+                : "No quizzes have been shared with you yet"}
             </p>
-            {filters.view === 'my-quizzes' && (
+            {filters.view === "my-quizzes" && (
               <Button
                 variant="outline"
                 className="mt-4"
-                onClick={() => router.push('/createquiz')}
+                onClick={() => router.push("/createquiz")}
               >
                 Create a Quiz
               </Button>
@@ -421,7 +454,13 @@ const QuizBank = () => {
         )}
 
         {!loading && hasMore && (
-          <div ref={ref} className="h-10" />
+          <div ref={ref} className="h-10 flex items-center justify-center my-4">
+            {isLoadingMore && (
+              <div className="text-sm text-gray-500">
+                Loading more quizzes...
+              </div>
+            )}
+          </div>
         )}
       </div>
     </TeacherLayout>
