@@ -52,7 +52,7 @@
     "html5-qrcode": "^2.3.8",
     "jszip": "^3.10.1",
     "lucide-react": "^0.446.0",
-    "next": "^15.0.3",
+    "next": "15.0.7",
     "process": "^0.11.10",
     "qr-scanner": "^1.4.2",
     "qrcode.react": "^4.1.0",
